@@ -1,0 +1,154 @@
+[gd_scene format=3 uid="uid://c55mgwl40rkw1"]
+
+[ext_resource type="Script" uid="uid://cl83sko077ucl" path="res://ui/character_select/character_select.gd" id="1_screen"]
+[ext_resource type="Script" uid="uid://cpc60kaqsdmsl" path="res://ui/character_select/fighter_panel.gd" id="2_panel"]
+[ext_resource type="Script" uid="uid://bncxo64kwm3s7" path="res://data/character_data.gd" id="3_data"]
+[ext_resource type="Resource" path="res://data/characters/kaal.tres" id="4_kaal"]
+[ext_resource type="Resource" path="res://data/characters/nex.tres" id="5_nex"]
+[ext_resource type="Texture2D" uid="uid://cmbqd5yogwtf7" path="res://assets/ui/character_select_bg.png" id="6_bg"]
+
+[node name="CharacterSelect" type="Control" unique_id=133645131]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_screen")
+roster = Array[ExtResource("3_data")]([ExtResource("4_kaal"), ExtResource("5_nex")])
+next_scene = "uid://cmuw42t8ry3j6"
+
+[node name="Background" type="TextureRect" parent="." unique_id=351051793]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("6_bg")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="SafeArea" type="MarginContainer" parent="." unique_id=437056005]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 56
+theme_override_constants/margin_top = 36
+theme_override_constants/margin_right = 56
+theme_override_constants/margin_bottom = 64
+
+[node name="Layout" type="VBoxContainer" parent="SafeArea" unique_id=1929469976]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Header" type="HBoxContainer" parent="SafeArea/Layout" unique_id=1622308952]
+layout_mode = 2
+
+[node name="BackButton" type="Button" parent="SafeArea/Layout/Header" unique_id=1639560526]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(160, 52)
+layout_mode = 2
+focus_mode = 0
+theme_override_font_sizes/font_size = 22
+text = "< BACK"
+
+[node name="TitleLabel" type="Label" parent="SafeArea/Layout/Header" unique_id=1359917305]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 48
+text = "SELECT YOUR FIGHTER"
+horizontal_alignment = 1
+
+[node name="HeaderBalance" type="Control" parent="SafeArea/Layout/Header" unique_id=1137253059]
+custom_minimum_size = Vector2(160, 0)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Stage" type="HBoxContainer" parent="SafeArea/Layout" unique_id=600817127]
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="P1Panel" type="VBoxContainer" parent="SafeArea/Layout/Stage" unique_id=1484559554]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+script = ExtResource("2_panel")
+
+[node name="StageGap" type="Control" parent="SafeArea/Layout/Stage" unique_id=1977905379]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 0.35
+mouse_filter = 2
+
+[node name="P2Panel" type="VBoxContainer" parent="SafeArea/Layout/Stage" unique_id=1980861066]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+script = ExtResource("2_panel")
+slot = 1
+tag_text = "PLAYER 2"
+flip_portrait = true
+
+[node name="HintLabel" type="Label" parent="SafeArea/Layout" unique_id=2001279327]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.75, 0.78, 0.88, 0.8)
+theme_override_font_sizes/font_size = 18
+horizontal_alignment = 1
+
+[node name="RosterDock" type="VBoxContainer" parent="." unique_id=1528828929]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -260.0
+offset_top = -330.0
+offset_right = 260.0
+offset_bottom = -112.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+theme_override_constants/separation = 8
+alignment = 2
+
+[node name="StatusLabel" type="Label" parent="RosterDock" unique_id=417934195]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+theme_override_font_sizes/font_size = 36
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="RosterCenter" type="CenterContainer" parent="RosterDock" unique_id=1202671386]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="RosterGrid" type="GridContainer" parent="RosterDock/RosterCenter" unique_id=439187975]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/h_separation = 16
+theme_override_constants/v_separation = 16
+columns = 4
+
+[node name="Fade" type="ColorRect" parent="." unique_id=2075002317]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 0)

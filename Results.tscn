@@ -1,0 +1,91 @@
+[gd_scene format=3 uid="uid://buewabb0ntsjc"]
+
+[ext_resource type="Texture2D" uid="uid://c3cwha4x5p2hg" path="res://assets/ui/Victory_Screen.png" id="1_1eby8"]
+[ext_resource type="Script" uid="uid://x0vkgxythvqy" path="res://results.gd" id="1_u3bd2"]
+[ext_resource type="Texture2D" uid="uid://cc8p2wd46qmr7" path="res://assets/characters/kaal/kaal_portrait.png" id="2_k42qf"]
+
+[node name="Results" type="Control" unique_id=1937313908]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_u3bd2")
+
+[node name="BackgroundImage" type="TextureRect" parent="." unique_id=8717268]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("1_1eby8")
+expand_mode = 1
+
+[node name="ColorRect" type="ColorRect" parent="." unique_id=182524855]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.4117647)
+
+[node name="VictoryTitle" type="Label" parent="." unique_id=607526409]
+layout_mode = 0
+offset_top = 35.0
+offset_right = 1152.0
+offset_bottom = 105.0
+theme_override_colors/font_color = Color(0.9607843, 0.84313726, 0.43137255, 1)
+theme_override_font_sizes/font_size = 56
+text = "VICTORY"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="WinnerName" type="Label" parent="." unique_id=1006522830]
+layout_mode = 0
+offset_top = 110.0
+offset_right = 1152.0
+offset_bottom = 170.0
+theme_override_font_sizes/font_size = 38
+text = "KAAL WINS!"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="WinnerPortrait" type="TextureRect" parent="." unique_id=1177001041]
+layout_mode = 0
+offset_left = 426.0
+offset_top = 175.0
+offset_right = 726.0
+offset_bottom = 475.0
+mouse_filter = 2
+texture = ExtResource("2_k42qf")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="FinalScore" type="Label" parent="." unique_id=2006793145]
+layout_mode = 0
+offset_top = 535.0
+offset_right = 1152.0
+offset_bottom = 575.0
+theme_override_font_sizes/font_size = 22
+text = "FINAL SCORE"
+horizontal_alignment = 1
+
+[node name="RematchButton" type="Button" parent="." unique_id=1586827303]
+layout_mode = 0
+offset_left = 326.0
+offset_top = 590.0
+offset_right = 546.0
+offset_bottom = 635.0
+text = "REMATCH"
+
+[node name="MainMenuButton" type="Button" parent="." unique_id=105155943]
+layout_mode = 0
+offset_left = 606.0
+offset_top = 590.0
+offset_right = 826.0
+offset_bottom = 635.0
+text = "MAIN MENU"

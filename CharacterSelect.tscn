@@ -1,0 +1,228 @@
+[gd_scene format=3 uid="uid://cjmtc3orrycsw"]
+
+[ext_resource type="Texture2D" uid="uid://cmbqd5yogwtf7" path="res://assets/ui/character_select_bg.png" id="2_ejo3v"]
+[ext_resource type="Texture2D" uid="uid://cc8p2wd46qmr7" path="res://assets/characters/kaal/kaal_portrait.png" id="2_ppjiv"]
+[ext_resource type="Texture2D" uid="uid://b38rgix4d8bum" path="res://assets/characters/nex/nex_portrait.png" id="3_ejo3v"]
+
+[sub_resource type="GDScript" id="GDScript_ppjiv"]
+script/source = "
+extends Control
+
+var player1_choice: String = \"KAAL\"
+var player2_choice: String = \"NEX\"
+
+@onready var p1_kaal: Button = $Roster/P1RosterRow/P1KaalCard/P1KaalButton
+@onready var p1_nex: Button = $Roster/P1RosterRow/P1NexCard/P1NexButton
+
+@onready var p2_kaal: Button = $Roster/P2RosterRow/P2KaalCard/P2KaalButton
+@onready var p2_nex: Button = $Roster/P2RosterRow/P2NexCard/P2NexButton
+
+@onready var fight_button: Button = $Content/FightButton
+@onready var back_button: Button = $Content/BackButton
+
+@onready var p1_portrait: TextureRect = $Player1Display/CharacterPortrait
+@onready var p1_name: Label = $Player1Display/CharacterName
+
+@onready var p2_portrait: TextureRect = $Player2Display/CharacterPortrait
+@onready var p2_name: Label = $Player2Display/CharacterName
+
+const KAAL_PORTRAIT: Texture2D = preload(
+	\"res://assets/characters/kaal/kaal_portrait.png\"
+)
+
+const NEX_PORTRAIT: Texture2D = preload(
+	\"res://assets/characters/nex/nex_portrait.png\"
+)
+
+
+func _ready() -> void:
+	print(\"P1 KAAL button: \", p1_kaal)
+	print(\"P1 NEX button: \", p1_nex)
+	print(\"P2 KAAL button: \", p2_kaal)
+	print(\"P2 NEX button: \", p2_nex)
+	print(\"Fight button: \", fight_button)
+	print(\"Back button: \", back_button)
+	p1_kaal.pressed.connect(_on_p1_kaal_pressed)
+	p1_nex.pressed.connect(_on_p1_nex_pressed)
+	p2_kaal.pressed.connect(_on_p2_kaal_pressed)
+	p2_nex.pressed.connect(_on_p2_nex_pressed)
+
+	fight_button.pressed.connect(_on_fight_pressed)
+	back_button.pressed.connect(_on_back_pressed)
+	update_selection_display()
+
+
+func _on_p1_kaal_pressed() -> void:
+	player1_choice = \"KAAL\"
+	update_selection_display()
+
+
+func _on_p1_nex_pressed() -> void:
+	player1_choice = \"NEX\"
+	update_selection_display()
+
+
+func _on_p2_kaal_pressed() -> void:
+	player2_choice = \"KAAL\"
+	update_selection_display()
+
+
+func _on_p2_nex_pressed() -> void:
+	player2_choice = \"NEX\"
+	update_selection_display()
+
+
+
+func update_selection_display() -> void:
+	p1_kaal.text = \"KAAL  ✓\" if player1_choice == \"KAAL\" else \"KAAL\"
+	p1_nex.text = \"NEX  ✓\" if player1_choice == \"NEX\" else \"NEX\"
+
+	p2_kaal.text = \"KAAL  ✓\" if player2_choice == \"KAAL\" else \"KAAL\"
+	p2_nex.text = \"NEX  ✓\" if player2_choice == \"NEX\" else \"NEX\"
+
+	update_large_portraits()
+	print(\"Player 1 selected: \", player1_choice)
+	print(\"Player 2 selected: \", player2_choice)
+
+
+
+func _on_fight_pressed() -> void:
+	GameSettings.player1_character = player1_choice
+	GameSettings.player2_character = player2_choice
+	get_tree().change_scene_to_file(\"res://Main.tscn\")
+
+
+func _on_back_pressed() -> void:
+	get_tree().change_scene_to_file(\"res://MainMenu.tscn\")
+
+
+func update_large_portraits() -> void:
+	p1_portrait.texture = KAAL_PORTRAIT if player1_choice == \"KAAL\" else NEX_PORTRAIT
+	p1_name.text = player1_choice
+
+	p2_portrait.texture = KAAL_PORTRAIT if player2_choice == \"KAAL\" else NEX_PORTRAIT
+	p2_name.text = player2_choice
+"
+
+[node name="CharacterSelect" type="Control" unique_id=1184370534]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = SubResource("GDScript_ppjiv")
+
+[node name="BackgroundImage" type="TextureRect" parent="." unique_id=518834984]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -260.0
+offset_top = -146.5
+offset_right = 260.0
+offset_bottom = 146.5
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_ejo3v")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Background" type="ColorRect" parent="." unique_id=1950757814]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.01762025, 0.019017756, 0.032532025, 1)
+
+[node name="Content" type="VBoxContainer" parent="." unique_id=642283561]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -205.5
+offset_top = -87.5
+offset_right = 205.5
+offset_bottom = 87.5
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="Content" unique_id=1059519673]
+custom_minimum_size = Vector2(0, 55)
+layout_mode = 2
+theme_override_font_sizes/font_size = 36
+text = "CHOOSE YOUR FIGHTER"
+horizontal_alignment = 1
+
+[node name="FightButton" type="Button" parent="Content" unique_id=303003964]
+custom_minimum_size = Vector2(280, 52)
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "FIGHT!"
+
+[node name="BackButton" type="Button" parent="Content" unique_id=1621867894]
+custom_minimum_size = Vector2(280, 44)
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "BACK"
+
+[node name="Player1Display" type="Control" parent="." unique_id=1836147410]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 35.0
+offset_top = 100.0
+offset_right = 335.0
+offset_bottom = 530.0
+
+[node name="CharacterPortrait" type="TextureRect" parent="Player1Display" unique_id=1214931463]
+layout_mode = 0
+offset_left = -6.0
+offset_top = 204.0
+offset_right = 294.0
+offset_bottom = 554.0
+texture = ExtResource("2_ppjiv")
+expand_mode = 1
+
+[node name="CharacterName" type="Label" parent="Player1Display" unique_id=874471117]
+layout_mode = 0
+offset_top = 350.0
+offset_right = 300.0
+offset_bottom = 410.0
+theme_override_font_sizes/font_size = 42
+text = "KAAL"
+horizontal_alignment = 1
+
+[node name="Player2Display" type="Control" parent="." unique_id=95178143]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 820.0
+offset_top = 100.0
+offset_right = 1120.0
+offset_bottom = 530.0
+
+[node name="CharacterPortrait" type="TextureRect" parent="Player2Display" unique_id=228249976]
+layout_mode = 0
+offset_left = 33.0
+offset_top = 213.0
+offset_right = 333.0
+offset_bottom = 563.0
+texture = ExtResource("3_ejo3v")
+expand_mode = 1
+flip_h = true
+
+[node name="CharacterName" type="Label" parent="Player2Display" unique_id=1139719396]
+layout_mode = 0
+offset_top = 350.0
+offset_right = 300.0
+offset_bottom = 410.0
+theme_override_font_sizes/font_size = 42
+text = "NEX"
+horizontal_alignment = 1

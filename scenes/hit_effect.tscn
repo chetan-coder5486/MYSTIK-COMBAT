@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://bt4oyof6tjg4c"]
+
+[ext_resource type="Script" uid="uid://baklenyd2khnv" path="res://scenes/hit_effect.gd" id="1_flhpc"]
+
+[node name="HitEffect" type="Node2D" unique_id=838751137]
+script = ExtResource("1_flhpc")

@@ -1,0 +1,96 @@
+[gd_scene format=3 uid="uid://cmuw42t8ry3j6"]
+
+[ext_resource type="Script" uid="uid://dr4e1ohewklru" path="res://fighter.gd" id="1_glv2v"]
+[ext_resource type="Script" uid="uid://1njba1spfely" path="res://main.gd" id="1_uu6xs"]
+[ext_resource type="Script" uid="uid://d1hd66m8am1mh" path="res://combo_component.gd" id="3_r0du0"]
+[ext_resource type="Script" uid="uid://nt4ooa7sgf7u" path="res://combat_component.gd" id="4_cm0pq"]
+[ext_resource type="Script" uid="uid://cwl3qbsikv144" path="res://defense_component.gd" id="5_fos0i"]
+[ext_resource type="SpriteFrames" uid="uid://74r8mhv47w3q" path="res://kaal_frames.tres" id="6_lgr22"]
+[ext_resource type="SpriteFrames" uid="uid://btqo1yddnt6fy" path="res://nex_frames.tres" id="7_trn2v"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_ov7s5"]
+size = Vector2(40, 100)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_5eqb6"]
+size = Vector2(40, 100)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_f7pic"]
+size = Vector2(1152, 40)
+
+[node name="Main" type="Node2D" unique_id=680803143]
+script = ExtResource("1_uu6xs")
+
+[node name="Fighter1" type="CharacterBody2D" parent="." unique_id=1155618113]
+position = Vector2(250, 500)
+script = ExtResource("1_glv2v")
+
+[node name="ColorRect" type="ColorRect" parent="Fighter1" unique_id=929096672]
+visible = false
+offset_left = -20.0
+offset_top = -50.0
+offset_right = 20.0
+offset_bottom = 50.0
+color = Color(0, 0, 1, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Fighter1" unique_id=1125797371]
+shape = SubResource("RectangleShape2D_ov7s5")
+
+[node name="ComboComponent" type="Node" parent="Fighter1" unique_id=2124922612]
+script = ExtResource("3_r0du0")
+
+[node name="CombatComponent" type="Node" parent="Fighter1" unique_id=774242909]
+script = ExtResource("4_cm0pq")
+
+[node name="DefenseComponent" type="Node" parent="Fighter1" unique_id=1168939698]
+script = ExtResource("5_fos0i")
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="Fighter1" unique_id=83572601]
+z_index = 1
+scale = Vector2(0.15, 0.15)
+sprite_frames = ExtResource("6_lgr22")
+animation = &"ko"
+
+[node name="Fighter2" type="CharacterBody2D" parent="." unique_id=1225470398]
+position = Vector2(900, 500)
+script = ExtResource("1_glv2v")
+player_number = 2
+
+[node name="ColorRect" type="ColorRect" parent="Fighter2" unique_id=2073728184]
+visible = false
+offset_left = -20.0
+offset_top = -50.0
+offset_right = 20.0
+offset_bottom = 50.0
+color = Color(1, 0, 0, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Fighter2" unique_id=1740373817]
+shape = SubResource("RectangleShape2D_5eqb6")
+
+[node name="ComboComponent" type="Node" parent="Fighter2" unique_id=638052681]
+script = ExtResource("3_r0du0")
+
+[node name="CombatComponent" type="Node" parent="Fighter2" unique_id=773813871]
+script = ExtResource("4_cm0pq")
+
+[node name="DefenseComponent" type="Node" parent="Fighter2" unique_id=1525643093]
+script = ExtResource("5_fos0i")
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="Fighter2" unique_id=1283876797]
+scale = Vector2(0.15, 0.15)
+sprite_frames = ExtResource("7_trn2v")
+animation = &"block"
+
+[node name="ArenaFloor" type="StaticBody2D" parent="." unique_id=1575051064]
+position = Vector2(576, 570)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="ArenaFloor" unique_id=126607722]
+shape = SubResource("RectangleShape2D_f7pic")
+
+[node name="ColorRect" type="ColorRect" parent="ArenaFloor" unique_id=1260125384]
+offset_left = -576.0
+offset_top = -20.0
+offset_right = 576.0
+offset_bottom = 20.0
+color = Color(0.53333336, 0.2901961, 1, 1)
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=224434146]

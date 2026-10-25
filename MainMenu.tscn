@@ -1,0 +1,52 @@
+[gd_scene format=3 uid="uid://mrpsjkx6uqvg"]
+
+[ext_resource type="Script" uid="uid://bg38j6lve5vja" path="res://main_menu.gd" id="1_i26rj"]
+
+[node name="MainMenu" type="Control" unique_id=1325030325]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_i26rj")
+
+[node name="Background" type="ColorRect" parent="." unique_id=543837134]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.06666667, 0.07058824, 0.101960786, 1)
+
+[node name="MenuContainer" type="VBoxContainer" parent="." unique_id=2125220002]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 18
+
+[node name="Title" type="Label" parent="MenuContainer" unique_id=886638896]
+layout_mode = 2
+theme_override_font_sizes/font_size = 42
+text = "MYSTIK COMBAT"
+horizontal_alignment = 1
+
+[node name="PlayButton" type="Button" parent="MenuContainer" unique_id=827830350]
+custom_minimum_size = Vector2(280, 50)
+layout_mode = 2
+text = "PLAY"
+
+[node name="QuitButton" type="Button" parent="MenuContainer" unique_id=1971294970]
+custom_minimum_size = Vector2(280, 50)
+layout_mode = 2
+text = "QUIT"
