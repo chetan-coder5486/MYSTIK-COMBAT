@@ -1,5 +1,8 @@
-
 extends Node
+
+signal attack_started(kind: String)
+signal attack_ended(kind: String)
+signal ultimate_requested(fighter: CharacterBody2D)
 
 const LIGHT_STARTUP := 0.10
 const LIGHT_ACTIVE := 0.12
@@ -11,7 +14,20 @@ const HEAVY_ACTIVE := 0.16
 const HEAVY_RECOVERY := 0.42
 const HEAVY_DAMAGE := 16.0
 
+const SPECIAL_STARTUP := 0.16
+const SPECIAL_ACTIVE := 0.18
+const SPECIAL_RECOVERY := 0.32
+const SPECIAL_DAMAGE := 24.0   # 1.5x normal heavy damage (16.0 * 1.5 = 24.0)
+const SPECIAL_KI_COST := 40.0
+
+const ULTIMATE_STARTUP := 0.35
+const ULTIMATE_ACTIVE := 0.30
+const ULTIMATE_RECOVERY := 0.48
+const ULTIMATE_DAMAGE := 48.0  # 3.0x normal heavy damage (enhanced cinematic damage)
+const ULTIMATE_KI_COST := 100.0
+
 const HIT_EFFECT_SCENE: PackedScene = preload("res://scenes/hit_effect.tscn")
+const ENERGY_EFFECT_SCENE: PackedScene = preload("res://scenes/energy_effect.tscn")
 
 var attack_kind: String = ""
 var attack_time: float = 0.0
@@ -24,22 +40,29 @@ func _ready() -> void:
 	fighter = get_parent() as CharacterBody2D
 
 
-
 func start_attack(kind: String) -> void:
 	if fighter.defeated:
 		return
 
+	# Resource checks for Special and Ultimate
+	if kind == "special":
+		if not fighter.spend_ki(SPECIAL_KI_COST):
+			return
+	elif kind == "ultimate":
+		if not fighter.spend_ki(ULTIMATE_KI_COST):
+			return
+
 	attack_kind = kind
 	attack_time = 0.0
 	attack_has_hit = false
+	attack_started.emit(kind)
 
-	# Play the matching attack animation when available.
+	# Play matching attack animation
 	if fighter.animated_sprite != null:
 		var animation_name := ""
-
 		if kind == "light":
 			animation_name = "light_attack"
-		elif kind == "heavy":
+		elif kind in ["heavy", "special", "ultimate"]:
 			animation_name = "heavy_attack"
 
 		if (
@@ -49,9 +72,35 @@ func start_attack(kind: String) -> void:
 		):
 			fighter.animated_sprite.play(animation_name)
 
+	# Special attack launches energy wave projectile
+	if kind == "special":
+		spawn_energy_wave(false)
+	elif kind == "ultimate":
+		ultimate_requested.emit(fighter)
+		spawn_energy_wave(true)
+
 	fighter.queue_redraw()
 
-			
+
+func spawn_energy_wave(is_ult: bool) -> void:
+	var energy = ENERGY_EFFECT_SCENE.instantiate()
+	energy.character_name = fighter.character_name
+	energy.facing = fighter.facing
+	energy.attacker = fighter
+	energy.is_ultimate = is_ult
+	energy.damage = ULTIMATE_DAMAGE if is_ult else SPECIAL_DAMAGE
+	energy.arena_left = fighter.arena_left
+	energy.arena_right = fighter.arena_right
+	
+	var spawn_x: float = fighter.global_position.x + fighter.facing * (fighter.BODY_WIDTH * 0.5 + 24.0)
+	var spawn_y: float = fighter.global_position.y - 12.0
+	energy.global_position = Vector2(spawn_x, spawn_y)
+	
+	var scene_root := _get_effects_parent()
+	if scene_root != null:
+		scene_root.add_child(energy)
+
+
 func update_attack(delta: float, opponent: CharacterBody2D) -> void:
 	if fighter.defeated:
 		cancel_attack()
@@ -67,17 +116,16 @@ func update_attack(delta: float, opponent: CharacterBody2D) -> void:
 		fighter.queue_redraw()
 		return
 
-	var startup := LIGHT_STARTUP if attack_kind == "light" else HEAVY_STARTUP
-	var active := LIGHT_ACTIVE if attack_kind == "light" else HEAVY_ACTIVE
-	var recovery := LIGHT_RECOVERY if attack_kind == "light" else HEAVY_RECOVERY
+	var startup := get_startup_time(attack_kind)
+	var active := get_active_time(attack_kind)
+	var recovery := get_recovery_time(attack_kind)
 
+	# Melee hitbox check
 	if attack_time >= startup and attack_time < startup + active:
 		if not attack_has_hit and get_attack_hitbox().intersects(opponent.get_hurtbox()):
 			attack_has_hit = true
 			
-			spawn_hit_effect(opponent)
-			
-			var damage := LIGHT_DAMAGE if attack_kind == "light" else HEAVY_DAMAGE
+			var damage := get_attack_damage(attack_kind)
 			var landed: bool = opponent.take_damage(
 				damage,
 				fighter.facing,
@@ -86,7 +134,10 @@ func update_attack(delta: float, opponent: CharacterBody2D) -> void:
 
 			if landed:
 				fighter.combo_component.register_hit()
+				fighter.add_ki(12.0) # +12 Ki for a successful hit
+				spawn_hit_effect(opponent)
 			else:
+				opponent.add_ki(3.0)  # +3 Ki for a successful block
 				spawn_block_effect(opponent)
 
 	if attack_time >= startup + active + recovery:
@@ -95,11 +146,47 @@ func update_attack(delta: float, opponent: CharacterBody2D) -> void:
 	fighter.queue_redraw()
 
 
+func get_startup_time(kind: String) -> float:
+	match kind:
+		"light": return LIGHT_STARTUP
+		"heavy": return HEAVY_STARTUP
+		"special": return SPECIAL_STARTUP
+		"ultimate": return ULTIMATE_STARTUP
+		_: return LIGHT_STARTUP
+
+
+func get_active_time(kind: String) -> float:
+	match kind:
+		"light": return LIGHT_ACTIVE
+		"heavy": return HEAVY_ACTIVE
+		"special": return SPECIAL_ACTIVE
+		"ultimate": return ULTIMATE_ACTIVE
+		_: return LIGHT_ACTIVE
+
+
+func get_recovery_time(kind: String) -> float:
+	match kind:
+		"light": return LIGHT_RECOVERY
+		"heavy": return HEAVY_RECOVERY
+		"special": return SPECIAL_RECOVERY
+		"ultimate": return ULTIMATE_RECOVERY
+		_: return LIGHT_RECOVERY
+
+
+func get_attack_damage(kind: String) -> float:
+	match kind:
+		"light": return LIGHT_DAMAGE
+		"heavy": return HEAVY_DAMAGE
+		"special": return SPECIAL_DAMAGE
+		"ultimate": return ULTIMATE_DAMAGE
+		_: return LIGHT_DAMAGE
+
+
 func finish_attack_if_ready() -> void:
 	var total_time := (
-		LIGHT_STARTUP + LIGHT_ACTIVE + LIGHT_RECOVERY
-		if attack_kind == "light"
-		else HEAVY_STARTUP + HEAVY_ACTIVE + HEAVY_RECOVERY
+		get_startup_time(attack_kind)
+		+ get_active_time(attack_kind)
+		+ get_recovery_time(attack_kind)
 	)
 
 	if attack_time >= total_time:
@@ -107,15 +194,33 @@ func finish_attack_if_ready() -> void:
 
 
 func cancel_attack() -> void:
+	var previous_kind := attack_kind
 	attack_kind = ""
 	attack_time = 0.0
 	attack_has_hit = false
+	if previous_kind != "":
+		attack_ended.emit(previous_kind)
 	fighter.queue_redraw()
 
 
 func get_attack_hitbox() -> Rect2:
-	var reach := 65.0 if attack_kind == "light" else 85.0
-	var hit_height := 38.0 if attack_kind == "light" else 55.0
+	var reach: float = 65.0
+	var hit_height: float = 38.0
+	
+	match attack_kind:
+		"heavy":
+			reach = 85.0
+			hit_height = 55.0
+		"special":
+			reach = 95.0
+			hit_height = 62.0
+		"ultimate":
+			reach = 120.0
+			hit_height = 80.0
+		_: # light
+			reach = 65.0
+			hit_height = 38.0
+
 	var hit_y: float = fighter.global_position.y - 100.0 * 0.55
 	var hit_x: float
 	if fighter.facing > 0.0:
@@ -130,34 +235,49 @@ func is_attack_active() -> bool:
 	if attack_kind == "":
 		return false
 
-	var startup := LIGHT_STARTUP if attack_kind == "light" else HEAVY_STARTUP
-	var active := LIGHT_ACTIVE if attack_kind == "light" else HEAVY_ACTIVE
+	var startup := get_startup_time(attack_kind)
+	var active := get_active_time(attack_kind)
 
 	return attack_time >= startup and attack_time < startup + active
 
 
+func _get_effects_parent() -> Node:
+	if fighter != null and fighter.is_inside_tree():
+		var tree := fighter.get_tree()
+		if tree != null and tree.current_scene != null:
+			return tree.current_scene
+		if fighter.get_parent() != null:
+			return fighter.get_parent()
+	elif is_inside_tree():
+		var tree := get_tree()
+		if tree != null and tree.current_scene != null:
+			return tree.current_scene
+		if get_parent() != null:
+			return get_parent()
+	return null
+
+
 func spawn_hit_effect(opponent: CharacterBody2D) -> void:
+	var scene_root := _get_effects_parent()
+	if scene_root == null:
+		return
+
 	var effect := HIT_EFFECT_SCENE.instantiate()
-
 	effect.effect_kind = attack_kind
-
-	var overlap: Rect2 = (
-		get_attack_hitbox().intersection(opponent.get_hurtbox())
-	)
-
-	var scene_root := fighter.get_tree().current_scene
 	scene_root.add_child(effect)
-	effect.global_position = overlap.get_center()
+
+	var overlap: Rect2 = get_attack_hitbox().intersection(opponent.get_hurtbox())
+	effect.global_position = overlap.get_center() if overlap.size != Vector2.ZERO else opponent.global_position
 
 
 func spawn_block_effect(opponent: CharacterBody2D) -> void:
+	var scene_root := _get_effects_parent()
+	if scene_root == null:
+		return
+
 	var effect := HIT_EFFECT_SCENE.instantiate()
 	effect.effect_kind = "block"
-
-	var overlap: Rect2 = (
-		get_attack_hitbox().intersection(opponent.get_hurtbox())
-	)
-
-	var scene_root := fighter.get_tree().current_scene
 	scene_root.add_child(effect)
-	effect.global_position = overlap.get_center()
+
+	var overlap: Rect2 = get_attack_hitbox().intersection(opponent.get_hurtbox())
+	effect.global_position = overlap.get_center() if overlap.size != Vector2.ZERO else opponent.global_position

@@ -46,9 +46,10 @@ script = ExtResource("5_fos0i")
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="Fighter1" unique_id=83572601]
 z_index = 1
+position = Vector2(2, 2)
 scale = Vector2(0.15, 0.15)
 sprite_frames = ExtResource("6_lgr22")
-animation = &"ko"
+animation = &"idle"
 
 [node name="Fighter2" type="CharacterBody2D" parent="." unique_id=1225470398]
 position = Vector2(900, 500)
@@ -78,7 +79,7 @@ script = ExtResource("5_fos0i")
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="Fighter2" unique_id=1283876797]
 scale = Vector2(0.15, 0.15)
 sprite_frames = ExtResource("7_trn2v")
-animation = &"block"
+animation = &"idle"
 
 [node name="ArenaFloor" type="StaticBody2D" parent="." unique_id=1575051064]
 position = Vector2(576, 570)

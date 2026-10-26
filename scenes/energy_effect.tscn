@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://c83kndv21x7om"]
+
+[ext_resource type="Script" uid="uid://rpyhqp3gxmd5" path="res://scenes/energy_effect.gd" id="1_enrg1"]
+
+[node name="EnergyEffect" type="Node2D" unique_id=741029384]
+script = ExtResource("1_enrg1")

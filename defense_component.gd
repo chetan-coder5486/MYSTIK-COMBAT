@@ -1,4 +1,3 @@
-
 extends Node
 
 var fighter: CharacterBody2D
@@ -31,28 +30,43 @@ func take_damage(
 	if was_blocked:
 		final_damage *= 0.20
 	else:
-		fighter.stun_time = 0.22 if kind == "light" else 0.38
-
-		fighter.velocity.x = attacker_facing * (
-			180.0 if kind == "light" else 320.0
-		)
-
-		if fighter.is_on_floor():
-			fighter.velocity.y = -80.0
+		match kind:
+			"ultimate":
+				fighter.stun_time = 0.65
+				fighter.velocity.x = attacker_facing * 520.0
+				fighter.velocity.y = -140.0
+			"special":
+				fighter.stun_time = 0.42
+				fighter.velocity.x = attacker_facing * 380.0
+				if fighter.is_on_floor():
+					fighter.velocity.y = -90.0
+			"heavy":
+				fighter.stun_time = 0.38
+				fighter.velocity.x = attacker_facing * 320.0
+				if fighter.is_on_floor():
+					fighter.velocity.y = -80.0
+			_: # light
+				fighter.stun_time = 0.22
+				fighter.velocity.x = attacker_facing * 180.0
+				if fighter.is_on_floor():
+					fighter.velocity.y = -60.0
 
 	fighter.health = maxf(0.0, fighter.health - final_damage)
-	if not was_blocked:
-		fighter.hit_flash_time = 0.12
-		fighter.hit_reaction_time = 0.22 if kind == "heavy" else 0.16
 
-		if fighter.player_number == 1 and fighter.animated_sprite:
-			if (
-			fighter.animated_sprite.sprite_frames != null
-			and fighter.animated_sprite.sprite_frames.has_animation("hit_reaction")
-			):
+	# +0.4 Ki gain per point of damage taken (only if not defeated)
+	if fighter.health > 0.0:
+		fighter.add_ki(final_damage * 0.4)
+
+	if not was_blocked:
+		fighter.hit_flash_time = 0.14
+		fighter.hit_reaction_time = 0.28 if (kind == "heavy" or kind == "special" or kind == "ultimate") else 0.16
+
+		if fighter.animated_sprite != null:
+			var frames: SpriteFrames = fighter.animated_sprite.sprite_frames
+			if frames != null and frames.has_animation("hit_reaction"):
 				fighter.animated_sprite.play("hit_reaction")
 	else:
-	# A blocked hit should show the guard, not hit reaction.
+		# Blocked hit: guard is maintained
 		fighter.hit_flash_time = 0.0
 		fighter.hit_reaction_time = 0.0
 
@@ -66,9 +80,9 @@ func take_damage(
 		fighter.defeated = true
 		fighter.blocking = false
 		fighter.combat_component.cancel_attack()
-	# Play KO animation once.
+		# Play KO animation
 		if fighter.animated_sprite != null:
-			var frames = fighter.animated_sprite.sprite_frames
+			var frames: SpriteFrames = fighter.animated_sprite.sprite_frames
 			if frames != null and frames.has_animation("ko"):
 				fighter.animated_sprite.play("ko")
 

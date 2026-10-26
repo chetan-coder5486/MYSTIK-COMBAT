@@ -215,11 +215,8 @@ func _fade_from_black() -> void:
 	create_tween().tween_property(_fade, "modulate:a", 0.0, fade_time)
 
 
-func _play(stream: AudioStream) -> void:
-	if stream == null:
-		return
-	_sfx_player.stream = stream
-	_sfx_player.play()
+func _play(_stream: AudioStream) -> void:
+	return
 
 
 # --- Input map --------------------------------------------------------------
