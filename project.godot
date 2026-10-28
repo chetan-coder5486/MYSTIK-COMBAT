@@ -20,6 +20,8 @@ config/icon="res://icon.svg"
 GameSettings="*uid://pxhcyyrv20ji"
 Grimoire="*res://grimoire_loader.gd"
 HitStop="*res://hit_stop_manager.gd"
+HighScoreManager="*res://high_score_manager.gd"
+ArcadeManager="*res://arcade_manager.gd"
 
 [display]
 

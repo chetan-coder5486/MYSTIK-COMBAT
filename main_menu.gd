@@ -5,37 +5,56 @@ const KAAL_PORTRAIT: Texture2D = preload("res://assets/characters/kaal/kaal_port
 const NEX_PORTRAIT: Texture2D = preload("res://assets/characters/nex/nex_portrait.png")
 
 var _controls_modal: Control = null
+var _gauntlet_modal: Control = null
+var _selected_gauntlet_char: String = "KAAL"
+var _selected_gauntlet_diff: String = "WARRIOR"
+
 var _bg_texture_rect: TextureRect = null
 var _title_label: Label = null
-var _play_button: Button = null
 var _buttons: Array[Button] = []
+var _button_tweens: Dictionary = {}
+
+# Key art nodes for breathing bob
+var _kaal_art: TextureRect = null
+var _nex_art: TextureRect = null
 
 
 func _ready() -> void:
-	_build_background()
+	if has_node("/root/GameSettings"):
+		var gs = get_node("/root/GameSettings")
+		if gs.has_method("play_menu_music"):
+			gs.play_menu_music()
 
+	_build_background()
 	_build_particles()
-	_build_hero_cards()
-	_build_center_menu()
+	_build_key_art()
+	_build_scrim()
+	_build_left_menu()
 	_build_footer()
 	_build_controls_modal()
+	_build_gauntlet_modal()
 
-	# Start ambient title breathing tween
-	_start_title_pulse()
+	# Start dynamic art idle breathing animation
+	_start_key_art_breathing()
 
-	# Focus first button for immediate gamepad/keyboard navigation
+	# Focus first menu item for immediate gamepad/keyboard navigation
 	if _buttons.size() > 0:
 		_buttons[0].grab_focus()
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.is_pressed() and not event.is_echo():
-		if event.physical_keycode == KEY_ESCAPE:
-			if _controls_modal != null and _controls_modal.visible:
-				_toggle_controls_modal(false)
-			else:
-				get_tree().quit()
-		elif event.physical_keycode == KEY_C or event.physical_keycode == KEY_TAB:
+	if not (event is InputEventKey) or not event.is_pressed() or event.is_echo():
+		return
+
+	if event.physical_keycode == KEY_ESCAPE:
+		if _gauntlet_modal != null and _gauntlet_modal.visible:
+			_toggle_gauntlet_modal(false)
+		elif _controls_modal != null and _controls_modal.visible:
+			_toggle_controls_modal(false)
+		else:
+			get_tree().quit()
+	elif event.physical_keycode == KEY_C or event.physical_keycode == KEY_TAB:
+		if not (_gauntlet_modal != null and _gauntlet_modal.visible):
 			if _controls_modal != null:
 				_toggle_controls_modal(!_controls_modal.visible)
 
@@ -43,482 +62,289 @@ func _unhandled_input(event: InputEvent) -> void:
 # --- 1. Background & Atmosphere ----------------------------------------------
 
 func _build_background() -> void:
-	# Base arena texture
 	_bg_texture_rect = TextureRect.new()
 	_bg_texture_rect.texture = ARENA_BG
 	_bg_texture_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_bg_texture_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	_bg_texture_rect.position = Vector2.ZERO
 	_bg_texture_rect.size = Vector2(1152, 648)
 	_bg_texture_rect.pivot_offset = Vector2(576, 324)
 	add_child(_bg_texture_rect)
 
-	# Deep cinematic dark tint
+	# Deep base tint
 	var tint := ColorRect.new()
-	tint.position = Vector2.ZERO
 	tint.size = Vector2(1152, 648)
-	tint.color = Color(0.04, 0.05, 0.09, 0.82)
+	tint.color = Color(0.04, 0.05, 0.09, 0.70)
 	add_child(tint)
 
-	# Radial edge vignette (top and bottom gradient bars)
-	var top_vignette := ColorRect.new()
-	top_vignette.position = Vector2(0, 0)
-	top_vignette.size = Vector2(1152, 90)
-	top_vignette.color = Color(0.02, 0.02, 0.05, 0.75)
-	add_child(top_vignette)
-
-	var bottom_vignette := ColorRect.new()
-	bottom_vignette.position = Vector2(0, 560)
-	bottom_vignette.size = Vector2(1152, 88)
-	bottom_vignette.color = Color(0.02, 0.02, 0.05, 0.88)
-	add_child(bottom_vignette)
-
-	# Subtle breathing zoom on backdrop
+	# Subtle ambient zoom on arena backdrop
 	var tween := create_tween().set_loops()
-	tween.tween_property(_bg_texture_rect, "scale", Vector2(1.03, 1.03), 8.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tween.tween_property(_bg_texture_rect, "scale", Vector2(1.0, 1.0), 8.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(_bg_texture_rect, "scale", Vector2(1.025, 1.025), 9.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(_bg_texture_rect, "scale", Vector2(1.0, 1.0), 9.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
 func _build_particles() -> void:
 	var embers := CPUParticles2D.new()
 	embers.name = "MenuEmbers"
-	embers.amount = 38
-	embers.lifetime = 4.2
+	embers.amount = 28
+	embers.lifetime = 4.5
 	embers.preprocess = 2.0
 	embers.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
 	embers.emission_rect_extents = Vector2(576, 10)
 	embers.position = Vector2(576, 640)
 	embers.direction = Vector2(0, -1)
-	embers.spread = 35.0
-	embers.gravity = Vector2(0, -15)
-	embers.initial_velocity_min = 20.0
-	embers.initial_velocity_max = 60.0
+	embers.spread = 30.0
+	embers.gravity = Vector2(0, -16)
+	embers.initial_velocity_min = 18.0
+	embers.initial_velocity_max = 50.0
 	embers.scale_amount_min = 2.0
-	embers.scale_amount_max = 4.5
-	embers.color = Color(0.65, 0.4, 1.0, 0.6)
+	embers.scale_amount_max = 4.0
+	embers.color = Color(0.75, 0.45, 1.0, 0.5)
 	add_child(embers)
 
 
-# --- 2. Flank Character Showcase Cards ---------------------------------------
+# --- 2. Large Character Key Art ----------------------------------------------
 
-func _build_hero_cards() -> void:
-	# KAAL CARD (Left)
-	var kaal_panel := _create_character_card(
-		Vector2(32, 96),
-		Vector2(265, 480),
-		KAAL_PORTRAIT,
-		"KAAL",
-		"DIMENSIONAL BRAWLER",
-		Color(1.0, 0.78, 0.2), # Gold
-		Color(0.9, 0.35, 0.15), # Crimson/Amber
-		"115 HP", 1.0,
-		"HIGH (SEISMIC)", 0.95,
-		"295 PX/S", 0.65,
-		"Ancient martial titan wielding earthshaker shocks and devastating astral strikes."
-	)
-	add_child(kaal_panel)
+func _build_key_art() -> void:
+	var art_stage := Control.new()
+	art_stage.name = "KeyArtStage"
+	art_stage.size = Vector2(1152, 648)
+	art_stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(art_stage)
 
-	# NEX CARD (Right)
-	var nex_panel := _create_character_card(
-		Vector2(855, 96),
-		Vector2(265, 480),
-		NEX_PORTRAIT,
-		"NEX",
-		"NEON SPEEDSTER",
-		Color(0.25, 0.85, 1.0), # Cyan
-		Color(0.7, 0.35, 1.0),  # Purple
-		"90 HP", 0.75,
-		"RAPID (AGILE)", 0.8,
-		"420 PX/S", 1.0,
-		"Cybernetic ninja harnessing lightning rifts and supersonic aerial blades."
-	)
-	add_child(nex_panel)
+	# KAAL (Left-center of art stage, facing right toward Nex)
+	_kaal_art = TextureRect.new()
+	_kaal_art.texture = KAAL_PORTRAIT
+	_kaal_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_kaal_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_kaal_art.position = Vector2(490, 85)
+	_kaal_art.size = Vector2(410, 550)
+	_kaal_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_kaal_art.modulate = Color(0.92, 0.94, 1.0, 0.95)
+	art_stage.add_child(_kaal_art)
+
+	# NEX (Right of art stage, facing left toward Kaal)
+	_nex_art = TextureRect.new()
+	_nex_art.texture = NEX_PORTRAIT
+	_nex_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_nex_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_nex_art.flip_h = true
+	_nex_art.position = Vector2(740, 95)
+	_nex_art.size = Vector2(420, 540)
+	_nex_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_nex_art.modulate = Color(0.95, 0.98, 1.0, 0.95)
+	art_stage.add_child(_nex_art)
 
 
-func _create_character_card(
-	pos: Vector2,
-	card_size: Vector2,
-	portrait_texture: Texture2D,
-	char_name: String,
-	subtitle: String,
-	accent_color: Color,
-	secondary_color: Color,
-	stat_hp: String, stat_hp_ratio: float,
-	stat_dmg: String, stat_dmg_ratio: float,
-	stat_spd: String, stat_spd_ratio: float,
-	lore: String
-) -> PanelContainer:
-	var panel := PanelContainer.new()
-	panel.position = pos
-	panel.custom_minimum_size = card_size
-	panel.size = card_size
+func _start_key_art_breathing() -> void:
+	# Subtle, alternating breathing/floating bob
+	if _kaal_art != null:
+		var tw_kaal := create_tween().set_loops()
+		tw_kaal.tween_property(_kaal_art, "position:y", 77.0, 3.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tw_kaal.tween_property(_kaal_art, "position:y", 85.0, 3.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
-	var box := StyleBoxFlat.new()
-	box.bg_color = Color(0.07, 0.08, 0.13, 0.88)
-	box.border_width_left = 2
-	box.border_width_top = 2
-	box.border_width_right = 2
-	box.border_width_bottom = 2
-	box.border_color = accent_color * Color(1, 1, 1, 0.55)
-	box.set_corner_radius_all(12)
-	box.shadow_color = accent_color * Color(1, 1, 1, 0.15)
-	box.shadow_size = 8
-	panel.add_theme_stylebox_override("panel", box)
-
-	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 14)
-	margin.add_theme_constant_override("margin_top", 14)
-	margin.add_theme_constant_override("margin_right", 14)
-	margin.add_theme_constant_override("margin_bottom", 14)
-	panel.add_child(margin)
-
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 8)
-	margin.add_child(vbox)
-
-	# Portrait container with border
-	var portrait_box := PanelContainer.new()
-	portrait_box.custom_minimum_size = Vector2(237, 185)
-	var p_style := StyleBoxFlat.new()
-	p_style.bg_color = Color(0.04, 0.05, 0.08, 0.95)
-	p_style.set_corner_radius_all(8)
-	p_style.border_width_left = 1
-	p_style.border_width_top = 1
-	p_style.border_width_right = 1
-	p_style.border_width_bottom = 1
-	p_style.border_color = secondary_color * Color(1, 1, 1, 0.4)
-	portrait_box.add_theme_stylebox_override("panel", p_style)
-
-	var p_texture := TextureRect.new()
-	p_texture.texture = portrait_texture
-	p_texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	p_texture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	portrait_box.add_child(p_texture)
-	vbox.add_child(portrait_box)
-
-	# Name Label
-	var name_lbl := Label.new()
-	name_lbl.text = char_name
-	name_lbl.add_theme_font_size_override("font_size", 22)
-	name_lbl.add_theme_color_override("font_color", accent_color)
-	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(name_lbl)
-
-	# Subtitle Tag
-	var sub_lbl := Label.new()
-	sub_lbl.text = "[ %s ]" % subtitle
-	sub_lbl.add_theme_font_size_override("font_size", 11)
-	sub_lbl.add_theme_color_override("font_color", Color(0.75, 0.8, 0.9, 0.75))
-	sub_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(sub_lbl)
-
-	# Divider line
-	var div := ColorRect.new()
-	div.custom_minimum_size = Vector2(0, 1)
-	div.color = accent_color * Color(1, 1, 1, 0.3)
-	vbox.add_child(div)
-
-	# Stat Bars
-	vbox.add_child(_create_stat_row("HEALTH", stat_hp, stat_hp_ratio, accent_color))
-	vbox.add_child(_create_stat_row("DAMAGE", stat_dmg, stat_dmg_ratio, secondary_color))
-	vbox.add_child(_create_stat_row("SPEED", stat_spd, stat_spd_ratio, accent_color))
-
-	# Lore Description
-	var lore_lbl := Label.new()
-	lore_lbl.text = lore
-	lore_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	lore_lbl.add_theme_font_size_override("font_size", 10)
-	lore_lbl.add_theme_color_override("font_color", Color(0.7, 0.75, 0.85, 0.7))
-	lore_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(lore_lbl)
-
-	return panel
+	if _nex_art != null:
+		var tw_nex := create_tween().set_loops()
+		tw_nex.tween_property(_nex_art, "position:y", 103.0, 2.8).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tw_nex.tween_property(_nex_art, "position:y", 95.0, 2.8).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
-func _create_stat_row(label: String, val_text: String, ratio: float, color: Color) -> VBoxContainer:
-	var row := VBoxContainer.new()
-	row.add_theme_constant_override("separation", 2)
+# --- 3. Left-Side Readability Scrim (Horizontal Gradient) ---------------------
 
-	var text_row := HBoxContainer.new()
-	var l_lbl := Label.new()
-	l_lbl.text = label
-	l_lbl.add_theme_font_size_override("font_size", 10)
-	l_lbl.add_theme_color_override("font_color", Color(0.65, 0.7, 0.8))
-	text_row.add_child(l_lbl)
+func _build_scrim() -> void:
+	var grad := Gradient.new()
+	grad.colors = PackedColorArray([
+		Color(0.03, 0.04, 0.07, 0.96),
+		Color(0.03, 0.04, 0.07, 0.92),
+		Color(0.03, 0.04, 0.07, 0.0)
+	])
+	grad.offsets = PackedFloat32Array([0.0, 0.40, 0.70])
 
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	text_row.add_child(spacer)
+	var grad_tex := GradientTexture2D.new()
+	grad_tex.gradient = grad
+	grad_tex.width = 1152
+	grad_tex.height = 648
+	grad_tex.fill_from = Vector2(0.0, 0.5)
+	grad_tex.fill_to = Vector2(1.0, 0.5)
 
-	var v_lbl := Label.new()
-	v_lbl.text = val_text
-	v_lbl.add_theme_font_size_override("font_size", 10)
-	v_lbl.add_theme_color_override("font_color", color)
-	text_row.add_child(v_lbl)
-	row.add_child(text_row)
-
-	# Progress bar track
-	var track := ColorRect.new()
-	track.custom_minimum_size = Vector2(0, 5)
-	track.color = Color(0.12, 0.14, 0.22, 0.8)
-
-	var fill := ColorRect.new()
-	fill.position = Vector2.ZERO
-	fill.size = Vector2(237 * clampf(ratio, 0.0, 1.0), 5)
-	fill.color = color
-	track.add_child(fill)
-	row.add_child(track)
-
-	return row
+	var scrim := TextureRect.new()
+	scrim.texture = grad_tex
+	scrim.size = Vector2(1152, 648)
+	scrim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(scrim)
 
 
-# --- 3. Center Command Menu (Title & Buttons) --------------------------------
+# --- 4. Left-Aligned Text Menu & Wordmark ------------------------------------
 
-func _build_center_menu() -> void:
-	var center := VBoxContainer.new()
-	center.position = Vector2(325, 45)
-	center.custom_minimum_size = Vector2(502, 530)
-	center.size = Vector2(502, 530)
-	center.add_theme_constant_override("separation", 14)
-	center.alignment = BoxContainer.ALIGNMENT_CENTER
-	add_child(center)
-
-	# Super-title badge
-	var badge := Label.new()
-	badge.text = "✦  THE DIMENSIONAL CLASH  ✦"
-	badge.add_theme_font_size_override("font_size", 13)
-	badge.add_theme_color_override("font_color", Color(1.0, 0.85, 0.35, 0.9))
-	badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	center.add_child(badge)
-
-	# Main Title
+func _build_left_menu() -> void:
+	# Main Title Wordmark (Top-Left)
 	_title_label = Label.new()
 	_title_label.text = "MYSTIK COMBAT"
-	_title_label.add_theme_font_size_override("font_size", 48)
+	_title_label.position = Vector2(72, 60)
+	_title_label.size = Vector2(450, 52)
+	_title_label.add_theme_font_size_override("font_size", 44)
 	_title_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0))
-	_title_label.add_theme_color_override("font_shadow_color", Color(0.5, 0.1, 0.8, 0.8))
+	_title_label.add_theme_color_override("font_shadow_color", Color(0.45, 0.1, 0.75, 0.7))
 	_title_label.add_theme_constant_override("shadow_offset_x", 0)
 	_title_label.add_theme_constant_override("shadow_offset_y", 4)
-	_title_label.add_theme_constant_override("shadow_outline_size", 10)
-	_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_title_label.pivot_offset = Vector2(251, 30)
-	center.add_child(_title_label)
+	_title_label.add_theme_constant_override("shadow_outline_size", 8)
+	add_child(_title_label)
 
-	# Subtitle Tagline
-	var tagline := Label.new()
-	tagline.text = "OFFLINE LOCAL 2-PLAYER MARTIAL SHOWDOWN"
-	tagline.add_theme_font_size_override("font_size", 12)
-	tagline.add_theme_color_override("font_color", Color(0.65, 0.8, 0.95, 0.75))
-	tagline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	center.add_child(tagline)
+	# Navigation Container
+	var menu_vbox := VBoxContainer.new()
+	menu_vbox.position = Vector2(72, 172)
+	menu_vbox.custom_minimum_size = Vector2(360, 360)
+	menu_vbox.add_theme_constant_override("separation", 18)
+	add_child(menu_vbox)
 
-	# Glowing Energy Divider
-	var div_container := CenterContainer.new()
-	div_container.custom_minimum_size = Vector2(0, 16)
-	var div_line := ColorRect.new()
-	div_line.custom_minimum_size = Vector2(340, 2)
-	div_line.color = Color(0.4, 0.8, 1.0, 0.5)
-	div_container.add_child(div_line)
-	center.add_child(div_container)
+	# 1. ARCADE
+	var arcade_btn := _create_text_nav_button("ARCADE")
+	arcade_btn.pressed.connect(func(): _toggle_gauntlet_modal(true))
+	menu_vbox.add_child(arcade_btn)
+	_buttons.append(arcade_btn)
 
-	# Spacer
-	var sp := Control.new()
-	sp.custom_minimum_size = Vector2(0, 6)
-	center.add_child(sp)
+	# 2. VERSUS (2-PLAYER)
+	var versus_btn := _create_text_nav_button("VERSUS (2-PLAYER)")
+	versus_btn.pressed.connect(func(): _start_versus(false))
+	menu_vbox.add_child(versus_btn)
+	_buttons.append(versus_btn)
 
-	# Action Buttons
-	var btn_box := VBoxContainer.new()
-	btn_box.add_theme_constant_override("separation", 12)
-	center.add_child(btn_box)
+	# 3. VS CPU
+	var cpu_btn := _create_text_nav_button("VS CPU (AI)")
+	cpu_btn.pressed.connect(func(): _start_versus(true))
+	menu_vbox.add_child(cpu_btn)
+	_buttons.append(cpu_btn)
 
-	# 1. PLAY BATTLE
-	_play_button = _create_styled_button(
-		"⚔  ENTER BATTLE  (CHARACTER SELECT)",
-		54,
-		Color(0.2, 0.85, 1.0),
-		Color(0.85, 0.25, 0.95),
-		true
+	# 4. HALL OF FAME
+	var records_btn := _create_text_nav_button("HALL OF FAME")
+	records_btn.pressed.connect(func():
+		get_tree().change_scene_to_file("res://ui/HighScoreScreen.tscn")
 	)
-	_play_button.pressed.connect(_on_play_pressed)
-	btn_box.add_child(_play_button)
-	_buttons.append(_play_button)
+	menu_vbox.add_child(records_btn)
+	_buttons.append(records_btn)
 
-	# 2. QUICK MATCH
-	var quick_btn := _create_styled_button(
-		"⚡  QUICK DUEL  (KAAL VS NEX)",
-		46,
-		Color(1.0, 0.75, 0.2),
-		Color(0.9, 0.35, 0.15),
-		false
-	)
-	quick_btn.pressed.connect(_on_quick_fight_pressed)
-	btn_box.add_child(quick_btn)
-	_buttons.append(quick_btn)
-
-	# 3. OPPONENT MODE TOGGLE (ADAPTIVE AI / LOCAL 2-PLAYER)
-	var gs = get_node_or_null("/root/GameSettings")
-	var is_ai_init: bool = gs.vs_ai if gs else true
-	var mode_btn: Button = _create_styled_button(
-		"🤖  MODE: VS ADAPTIVE AI" if is_ai_init else "👥  MODE: LOCAL 2-PLAYER",
-		46,
-		Color(0.85, 0.45, 1.0) if is_ai_init else Color(0.3, 0.8, 1.0),
-		Color(0.5, 0.2, 0.8) if is_ai_init else Color(0.1, 0.4, 0.8),
-		false
-	)
-	mode_btn.pressed.connect(func():
-		if gs:
-			gs.vs_ai = not gs.vs_ai
-			var ai_now: bool = gs.vs_ai
-			mode_btn.text = "🤖  MODE: VS ADAPTIVE AI" if ai_now else "👥  MODE: LOCAL 2-PLAYER"
-	)
-	btn_box.add_child(mode_btn)
-	_buttons.append(mode_btn)
-
-	# 4. HOW TO PLAY / CONTROLS
-	var controls_btn := _create_styled_button(
-		"🎮  HOW TO PLAY  &  CONTROLS",
-		46,
-		Color(0.5, 0.75, 1.0),
-		Color(0.2, 0.5, 0.9),
-		false
-	)
+	# 5. HOW TO PLAY
+	var controls_btn := _create_text_nav_button("HOW TO PLAY")
 	controls_btn.pressed.connect(func(): _toggle_controls_modal(true))
-	btn_box.add_child(controls_btn)
+	menu_vbox.add_child(controls_btn)
 	_buttons.append(controls_btn)
 
-	# 4. QUIT GAME
-	var quit_btn := _create_styled_button(
-		"✕  QUIT GAME",
-		42,
-		Color(0.9, 0.3, 0.35),
-		Color(0.6, 0.15, 0.2),
-		false
-	)
+	# 6. QUIT
+	var quit_btn := _create_text_nav_button("QUIT")
 	quit_btn.pressed.connect(_on_quit_pressed)
-	btn_box.add_child(quit_btn)
+	menu_vbox.add_child(quit_btn)
 	_buttons.append(quit_btn)
 
 
-func _create_styled_button(
-	text: String,
-	height: int,
-	accent: Color,
-	secondary: Color,
-	is_primary: bool
-) -> Button:
+func _create_text_nav_button(label_text: String) -> Button:
 	var btn := Button.new()
-	btn.text = text
-	btn.custom_minimum_size = Vector2(440, height)
-	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	btn.pivot_offset = Vector2(220, height / 2.0)
-	btn.add_theme_font_size_override("font_size", 15 if not is_primary else 16)
+	btn.text = "   " + label_text
+	btn.custom_minimum_size = Vector2(320, 44)
+	btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	btn.add_theme_font_size_override("font_size", 30)
 
-	# Style Normal
-	var norm := StyleBoxFlat.new()
-	norm.bg_color = Color(0.08, 0.1, 0.16, 0.88 if not is_primary else 0.95)
-	norm.border_width_left = 2
-	norm.border_width_top = 2
-	norm.border_width_right = 2
-	norm.border_width_bottom = 2
-	norm.border_color = accent * Color(1, 1, 1, 0.5 if not is_primary else 0.85)
-	norm.set_corner_radius_all(8)
-	if is_primary:
-		norm.shadow_color = accent * Color(1, 1, 1, 0.25)
-		norm.shadow_size = 6
-	btn.add_theme_stylebox_override("normal", norm)
+	# Default empty styles (text-only, no boxes or colored rectangles)
+	var empty_box := StyleBoxEmpty.new()
+	btn.add_theme_stylebox_override("normal", empty_box)
+	btn.add_theme_stylebox_override("hover", empty_box)
+	btn.add_theme_stylebox_override("pressed", empty_box)
+	btn.add_theme_stylebox_override("focus", empty_box)
 
-	# Style Hover
-	var hover := StyleBoxFlat.new()
-	hover.bg_color = Color(0.12, 0.15, 0.24, 0.96)
-	hover.border_width_left = 2
-	hover.border_width_top = 2
-	hover.border_width_right = 2
-	hover.border_width_bottom = 2
-	hover.border_color = accent
-	hover.set_corner_radius_all(8)
-	hover.shadow_color = accent * Color(1, 1, 1, 0.4)
-	hover.shadow_size = 10
-	btn.add_theme_stylebox_override("hover", hover)
+	var dim_color := Color(0.68, 0.72, 0.82, 0.75)
+	var active_color := Color(1.0, 0.86, 0.28) # Electric gold accent
 
-	# Style Pressed
-	var pressed := StyleBoxFlat.new()
-	pressed.bg_color = secondary * Color(1, 1, 1, 0.35)
-	pressed.border_width_left = 2
-	pressed.border_width_top = 2
-	pressed.border_width_right = 2
-	pressed.border_width_bottom = 2
-	pressed.border_color = accent
-	pressed.set_corner_radius_all(8)
-	btn.add_theme_stylebox_override("pressed", pressed)
+	btn.add_theme_color_override("font_color", dim_color)
+	btn.add_theme_color_override("font_hover_color", active_color)
+	btn.add_theme_color_override("font_focus_color", active_color)
 
-	# Style Focus
-	var focus := StyleBoxFlat.new()
-	focus.bg_color = Color(0.12, 0.15, 0.24, 0.96)
-	focus.border_width_left = 2
-	focus.border_width_top = 2
-	focus.border_width_right = 2
-	focus.border_width_bottom = 2
-	focus.border_color = Color.WHITE
-	focus.set_corner_radius_all(8)
-	focus.shadow_color = accent * Color(1, 1, 1, 0.5)
-	focus.shadow_size = 12
-	btn.add_theme_stylebox_override("focus", focus)
+	# Slide and pointer arrow on hover/focus
+	var on_focus = func():
+		btn.text = "▸  " + label_text
+		btn.add_theme_color_override("font_color", active_color)
+		btn.add_theme_color_override("font_shadow_color", Color(1.0, 0.6, 0.1, 0.5))
+		btn.add_theme_constant_override("shadow_offset_y", 2)
+		btn.add_theme_constant_override("shadow_outline_size", 4)
+		_slide_button(btn, 16.0)
 
-	# Hover micro-animation
-	btn.mouse_entered.connect(func():
-		var tw := create_tween()
-		tw.tween_property(btn, "scale", Vector2(1.035, 1.035), 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	)
-	btn.mouse_exited.connect(func():
-		var tw := create_tween()
-		tw.tween_property(btn, "scale", Vector2(1.0, 1.0), 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	)
+	var on_unfocus = func():
+		btn.text = "   " + label_text
+		btn.add_theme_color_override("font_color", dim_color)
+		btn.remove_theme_color_override("font_shadow_color")
+		_slide_button(btn, 0.0)
+
+	btn.focus_entered.connect(on_focus)
+	btn.mouse_entered.connect(on_focus)
+	btn.focus_exited.connect(on_unfocus)
+	btn.mouse_exited.connect(on_unfocus)
 
 	return btn
 
 
-func _start_title_pulse() -> void:
-	if _title_label == null:
-		return
-	var tw := create_tween().set_loops()
-	tw.tween_property(_title_label, "scale", Vector2(1.025, 1.025), 2.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tw.tween_property(_title_label, "scale", Vector2(1.0, 1.0), 2.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+func _slide_button(btn: Button, target_x: float) -> void:
+	var tw = _button_tweens.get(btn)
+	if tw != null and tw.is_valid():
+		tw.kill()
+	tw = create_tween()
+	tw.tween_property(btn, "position:x", target_x, 0.10).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_button_tweens[btn] = tw
 
 
-# --- 4. Interactive Controls Modal -------------------------------------------
+# --- 5. Clean Keycap Footer --------------------------------------------------
 
-func _build_controls_modal() -> void:
-	_controls_modal = Control.new()
-	_controls_modal.position = Vector2.ZERO
-	_controls_modal.size = Vector2(1152, 648)
-	_controls_modal.visible = false
-	_controls_modal.z_index = 50
-	add_child(_controls_modal)
+func _build_footer() -> void:
+	var footer := HBoxContainer.new()
+	footer.position = Vector2(72, 595)
+	footer.size = Vector2(1008, 26)
 
-	# Fullscreen dark overlay
+	var controls_lbl := Label.new()
+	controls_lbl.text = "[W / S / ↑ / ↓] Navigate  •  [ENTER / SPACE] Select  •  [C] Controls  •  [ESC] Quit"
+	controls_lbl.add_theme_font_size_override("font_size", 13)
+	controls_lbl.add_theme_color_override("font_color", Color(0.65, 0.70, 0.82, 0.75))
+	footer.add_child(controls_lbl)
+
+	var sp := Control.new()
+	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	footer.add_child(sp)
+
+	var ver := Label.new()
+	ver.text = "v1.2.0"
+	ver.add_theme_font_size_override("font_size", 13)
+	ver.add_theme_color_override("font_color", Color(0.65, 0.70, 0.82, 0.65))
+	footer.add_child(ver)
+
+	add_child(footer)
+
+
+# --- 6. The Gauntlet Setup Modal ---------------------------------------------
+
+func _build_gauntlet_modal() -> void:
+	_gauntlet_modal = Control.new()
+	_gauntlet_modal.size = Vector2(1152, 648)
+	_gauntlet_modal.visible = false
+	_gauntlet_modal.z_index = 25
+	add_child(_gauntlet_modal)
+
 	var backdrop := ColorRect.new()
 	backdrop.size = Vector2(1152, 648)
-	backdrop.color = Color(0.02, 0.03, 0.06, 0.88)
-	_controls_modal.add_child(backdrop)
+	backdrop.color = Color(0.02, 0.03, 0.06, 0.90)
+	_gauntlet_modal.add_child(backdrop)
 
-	# Modal dialog box
 	var dialog := PanelContainer.new()
-	dialog.custom_minimum_size = Vector2(820, 520)
-	dialog.size = Vector2(820, 520)
-	dialog.position = Vector2(166, 64)
+	dialog.custom_minimum_size = Vector2(720, 460)
+	dialog.size = Vector2(720, 460)
+	dialog.position = Vector2(216, 94)
 
 	var d_style := StyleBoxFlat.new()
-	d_style.bg_color = Color(0.08, 0.09, 0.14, 0.98)
+	d_style.bg_color = Color(0.08, 0.09, 0.15, 0.98)
 	d_style.border_width_left = 2
 	d_style.border_width_top = 2
 	d_style.border_width_right = 2
 	d_style.border_width_bottom = 2
-	d_style.border_color = Color(0.3, 0.75, 1.0, 0.85)
-	d_style.set_corner_radius_all(14)
-	d_style.shadow_color = Color(0.1, 0.5, 0.9, 0.25)
+	d_style.border_color = Color(1.0, 0.8, 0.25, 0.9)
+	d_style.set_corner_radius_all(12)
+	d_style.shadow_color = Color(1.0, 0.6, 0.1, 0.25)
 	d_style.shadow_size = 18
 	dialog.add_theme_stylebox_override("panel", d_style)
-	_controls_modal.add_child(dialog)
+	_gauntlet_modal.add_child(dialog)
 
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 26)
@@ -531,11 +357,242 @@ func _build_controls_modal() -> void:
 	vbox.add_theme_constant_override("separation", 14)
 	margin.add_child(vbox)
 
-	# Modal Header
+	# Header
+	var h_title := Label.new()
+	h_title.text = "THE GAUNTLET — ARCADE LADDER"
+	h_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	h_title.add_theme_font_size_override("font_size", 22)
+	h_title.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3))
+	vbox.add_child(h_title)
+
+	var h_sub := Label.new()
+	h_sub.text = "4 Consecutive Trials culminating in a Formidable Final Boss encounter."
+	h_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	h_sub.add_theme_font_size_override("font_size", 12)
+	h_sub.add_theme_color_override("font_color", Color(0.75, 0.85, 1.0, 0.8))
+	vbox.add_child(h_sub)
+
+	var div := ColorRect.new()
+	div.custom_minimum_size = Vector2(0, 1)
+	div.color = Color(1.0, 0.8, 0.2, 0.3)
+	vbox.add_child(div)
+
+	# 1. Champion Selection
+	var c_title := Label.new()
+	c_title.text = "CHOOSE YOUR FIGHTER:"
+	c_title.add_theme_font_size_override("font_size", 13)
+	c_title.add_theme_color_override("font_color", Color(0.7, 0.85, 1.0))
+	vbox.add_child(c_title)
+
+	var char_row := HBoxContainer.new()
+	char_row.add_theme_constant_override("separation", 16)
+	vbox.add_child(char_row)
+
+	var kaal_btn := Button.new()
+	kaal_btn.text = "KAAL [BRAWLER]"
+	kaal_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	kaal_btn.custom_minimum_size = Vector2(0, 40)
+	char_row.add_child(kaal_btn)
+
+	var nex_btn := Button.new()
+	nex_btn.text = "NEX [SPEEDSTER]"
+	nex_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	nex_btn.custom_minimum_size = Vector2(0, 40)
+	char_row.add_child(nex_btn)
+
+	var update_char_btns = func():
+		_style_select_button(kaal_btn, _selected_gauntlet_char == "KAAL", Color(1.0, 0.6, 0.2))
+		_style_select_button(nex_btn, _selected_gauntlet_char == "NEX", Color(0.2, 0.85, 1.0))
+
+	kaal_btn.pressed.connect(func():
+		_selected_gauntlet_char = "KAAL"
+		update_char_btns.call()
+	)
+	nex_btn.pressed.connect(func():
+		_selected_gauntlet_char = "NEX"
+		update_char_btns.call()
+	)
+	update_char_btns.call()
+
+	# 2. Difficulty Selection
+	var d_title := Label.new()
+	d_title.text = "SELECT DIFFICULTY:"
+	d_title.add_theme_font_size_override("font_size", 13)
+	d_title.add_theme_color_override("font_color", Color(0.7, 0.85, 1.0))
+	vbox.add_child(d_title)
+
+	var diff_row := HBoxContainer.new()
+	diff_row.add_theme_constant_override("separation", 12)
+	vbox.add_child(diff_row)
+
+	var novice_btn := Button.new()
+	novice_btn.text = "NOVICE (1.0x)"
+	novice_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	novice_btn.custom_minimum_size = Vector2(0, 40)
+	diff_row.add_child(novice_btn)
+
+	var warrior_btn := Button.new()
+	warrior_btn.text = "WARRIOR (1.5x)"
+	warrior_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	warrior_btn.custom_minimum_size = Vector2(0, 40)
+	diff_row.add_child(warrior_btn)
+
+	var master_btn := Button.new()
+	master_btn.text = "MASTER (2.5x)"
+	master_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	master_btn.custom_minimum_size = Vector2(0, 40)
+	diff_row.add_child(master_btn)
+
+	var desc_label := Label.new()
+	desc_label.custom_minimum_size = Vector2(0, 32)
+	desc_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	desc_label.add_theme_font_size_override("font_size", 12)
+	desc_label.add_theme_color_override("font_color", Color(0.75, 0.8, 0.9))
+	vbox.add_child(desc_label)
+
+	var update_diff_btns = func():
+		_style_select_button(novice_btn, _selected_gauntlet_diff == "NOVICE", Color(0.3, 0.85, 0.4))
+		_style_select_button(warrior_btn, _selected_gauntlet_diff == "WARRIOR", Color(1.0, 0.8, 0.2))
+		_style_select_button(master_btn, _selected_gauntlet_diff == "MASTER", Color(1.0, 0.3, 0.3))
+
+		match _selected_gauntlet_diff:
+			"NOVICE":
+				desc_label.text = "• Forgiving AI reaction times • 15% player damage reduction • Base score"
+			"WARRIOR":
+				desc_label.text = "• Adaptive behavior-tree AI • Standard competitive rules • 1.5x Score Multiplier"
+			"MASTER":
+				desc_label.text = "• Hyper-reactive AI Punish counters • High aggression • 2.5x Score Multiplier"
+
+	novice_btn.pressed.connect(func():
+		_selected_gauntlet_diff = "NOVICE"
+		update_diff_btns.call()
+	)
+	warrior_btn.pressed.connect(func():
+		_selected_gauntlet_diff = "WARRIOR"
+		update_diff_btns.call()
+	)
+	master_btn.pressed.connect(func():
+		_selected_gauntlet_diff = "MASTER"
+		update_diff_btns.call()
+	)
+	update_diff_btns.call()
+
+	var sp := Control.new()
+	sp.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(sp)
+
+	# Action Row
+	var act_row := HBoxContainer.new()
+	act_row.add_theme_constant_override("separation", 16)
+	act_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.add_child(act_row)
+
+	var cancel_btn := Button.new()
+	cancel_btn.text = "CANCEL [ESC]"
+	cancel_btn.custom_minimum_size = Vector2(160, 42)
+	cancel_btn.pressed.connect(func(): _toggle_gauntlet_modal(false))
+	_style_select_button(cancel_btn, false, Color(0.6, 0.65, 0.75))
+	act_row.add_child(cancel_btn)
+
+	var start_btn := Button.new()
+	start_btn.text = "START GAUNTLET"
+	start_btn.custom_minimum_size = Vector2(240, 42)
+	_style_select_button(start_btn, true, Color(1.0, 0.85, 0.25))
+	start_btn.pressed.connect(_on_start_gauntlet)
+	act_row.add_child(start_btn)
+
+
+func _style_select_button(btn: Button, is_active: bool, accent: Color) -> void:
+	var box := StyleBoxFlat.new()
+	box.set_corner_radius_all(6)
+	box.border_width_left = 2
+	box.border_width_top = 2
+	box.border_width_right = 2
+	box.border_width_bottom = 2
+	if is_active:
+		box.bg_color = Color(accent.r * 0.25, accent.g * 0.25, accent.b * 0.25, 0.95)
+		box.border_color = accent
+		btn.add_theme_color_override("font_color", Color.WHITE)
+	else:
+		box.bg_color = Color(0.08, 0.1, 0.16, 0.85)
+		box.border_color = Color(accent.r, accent.g, accent.b, 0.3)
+		btn.add_theme_color_override("font_color", Color(0.7, 0.75, 0.85))
+	btn.add_theme_stylebox_override("normal", box)
+	var h_box := box.duplicate()
+	h_box.bg_color = box.bg_color * Color(1.25, 1.25, 1.25, 1.0)
+	btn.add_theme_stylebox_override("hover", h_box)
+	btn.add_theme_stylebox_override("focus", h_box)
+
+
+func _toggle_gauntlet_modal(show_modal: bool) -> void:
+	if _gauntlet_modal == null:
+		return
+	_gauntlet_modal.visible = show_modal
+	if show_modal:
+		_gauntlet_modal.modulate = Color(1, 1, 1, 0)
+		var tw := create_tween()
+		tw.tween_property(_gauntlet_modal, "modulate", Color(1, 1, 1, 1), 0.15)
+	else:
+		if _buttons.size() > 0:
+			_buttons[0].grab_focus()
+
+
+func _on_start_gauntlet() -> void:
+	if has_node("/root/ArcadeManager"):
+		var am = get_node("/root/ArcadeManager")
+		am.start_arcade(_selected_gauntlet_diff, _selected_gauntlet_char)
+	get_tree().change_scene_to_file("res://ui/ArcadeLadder.tscn")
+
+
+# --- 7. Controls Modal -------------------------------------------------------
+
+func _build_controls_modal() -> void:
+	_controls_modal = Control.new()
+	_controls_modal.size = Vector2(1152, 648)
+	_controls_modal.visible = false
+	_controls_modal.z_index = 20
+	add_child(_controls_modal)
+
+	var backdrop := ColorRect.new()
+	backdrop.size = Vector2(1152, 648)
+	backdrop.color = Color(0.02, 0.03, 0.06, 0.88)
+	_controls_modal.add_child(backdrop)
+
+	var dialog := PanelContainer.new()
+	dialog.custom_minimum_size = Vector2(800, 500)
+	dialog.size = Vector2(800, 500)
+	dialog.position = Vector2(176, 74)
+
+	var d_style := StyleBoxFlat.new()
+	d_style.bg_color = Color(0.08, 0.09, 0.14, 0.98)
+	d_style.border_width_left = 2
+	d_style.border_width_top = 2
+	d_style.border_width_right = 2
+	d_style.border_width_bottom = 2
+	d_style.border_color = Color(0.3, 0.75, 1.0, 0.85)
+	d_style.set_corner_radius_all(12)
+	d_style.shadow_color = Color(0.1, 0.5, 0.9, 0.25)
+	d_style.shadow_size = 18
+	dialog.add_theme_stylebox_override("panel", d_style)
+	_controls_modal.add_child(dialog)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 24)
+	margin.add_theme_constant_override("margin_top", 20)
+	margin.add_theme_constant_override("margin_right", 24)
+	margin.add_theme_constant_override("margin_bottom", 20)
+	dialog.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 14)
+	margin.add_child(vbox)
+
+	# Header
 	var header := HBoxContainer.new()
 	var h_title := Label.new()
-	h_title.text = "⚔  HOW TO PLAY & CONTROLS GUIDE"
-	h_title.add_theme_font_size_override("font_size", 22)
+	h_title.text = "HOW TO PLAY — CONTROLS GUIDE"
+	h_title.add_theme_font_size_override("font_size", 20)
 	h_title.add_theme_color_override("font_color", Color(1.0, 0.85, 0.35))
 	header.add_child(h_title)
 
@@ -544,7 +601,7 @@ func _build_controls_modal() -> void:
 	header.add_child(sp)
 
 	var close_btn := Button.new()
-	close_btn.text = "✕ CLOSE [ESC]"
+	close_btn.text = "CLOSE [ESC]"
 	close_btn.add_theme_font_size_override("font_size", 12)
 	close_btn.pressed.connect(func(): _toggle_controls_modal(false))
 	header.add_child(close_btn)
@@ -555,15 +612,14 @@ func _build_controls_modal() -> void:
 	h_div.color = Color(0.3, 0.7, 1.0, 0.3)
 	vbox.add_child(h_div)
 
-	# Dual Columns for Player 1 & Player 2
+	# Columns
 	var cols := HBoxContainer.new()
 	cols.add_theme_constant_override("separation", 24)
 	cols.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	vbox.add_child(cols)
 
-	# P1 Column
 	var p1_box := _build_player_control_column(
-		"PLAYER 1 (KAAL / NEX)",
+		"PLAYER 1",
 		Color(1.0, 0.8, 0.25),
 		[
 			{"action": "Movement", "keys": "W (Jump)  •  A (Left)  •  D (Right)"},
@@ -572,85 +628,58 @@ func _build_controls_modal() -> void:
 			{"action": "Heavy Attack", "keys": "G (Heavy Knockback)"},
 			{"action": "Mystic Special", "keys": "Q (Requires 40 Ki)"},
 			{"action": "Cinematic Ultimate", "keys": "E (Requires 100 Ki)"},
-			{"action": "Gamepad 1", "keys": "Left Stick / D-Pad + Face Buttons"},
+			{"action": "Gamepad", "keys": "Left Stick / D-Pad + Face Buttons"},
 		]
 	)
 	p1_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	cols.add_child(p1_box)
 
-	# P2 Column
 	var p2_box := _build_player_control_column(
-		"PLAYER 2 (NEX / KAAL)",
+		"PLAYER 2",
 		Color(0.25, 0.85, 1.0),
 		[
-			{"action": "Movement", "keys": "↑ or Num 8 (Jump)  •  ← or Num 4  •  → or Num 6"},
-			{"action": "Defense", "keys": "↓ or Num 2 (Block - 65% Dmg Reduction)"},
-			{"action": "Light Attack", "keys": "/ or Num 1 (Fast Combo Opener)"},
-			{"action": "Heavy Attack", "keys": ". or Num 3 (Heavy Knockback)"},
+			{"action": "Movement", "keys": "↑ or Num 8 (Jump)  •  ← / →"},
+			{"action": "Defense", "keys": "↓ or Num 2 (Block)"},
+			{"action": "Light Attack", "keys": "/ or Num 1"},
+			{"action": "Heavy Attack", "keys": ". or Num 3"},
 			{"action": "Mystic Special", "keys": "Right Shift or Num 7 (40 Ki)"},
 			{"action": "Cinematic Ultimate", "keys": "Enter or Num 9 (100 Ki)"},
-			{"action": "Gamepad 2", "keys": "Full Native Gamepad 2 Support"},
+			{"action": "Gamepad", "keys": "Full Native Gamepad 2 Support"},
 		]
 	)
 	p2_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	cols.add_child(p2_box)
 
-	# Rules & Tip Box
-	var tip_panel := PanelContainer.new()
-	var t_style := StyleBoxFlat.new()
-	t_style.bg_color = Color(0.12, 0.15, 0.24, 0.7)
-	t_style.border_width_left = 1
-	t_style.border_width_top = 1
-	t_style.border_width_right = 1
-	t_style.border_width_bottom = 1
-	t_style.border_color = Color(1.0, 0.8, 0.2, 0.45)
-	t_style.set_corner_radius_all(6)
-	tip_panel.add_theme_stylebox_override("panel", t_style)
 
-	var t_margin := MarginContainer.new()
-	t_margin.add_theme_constant_override("margin_left", 12)
-	t_margin.add_theme_constant_override("margin_top", 8)
-	t_margin.add_theme_constant_override("margin_right", 12)
-	t_margin.add_theme_constant_override("margin_bottom", 8)
-	tip_panel.add_child(t_margin)
-
-	var tip_lbl := Label.new()
-	tip_lbl.text = "★ TIP: Best of 3 Knockout duel. Fill Ki by striking or being hit. In-game engineering tools: [F1] Grimoire Frame Data Inspector • [F2] Adaptive AI Brain Overlay • [F5] Live JSON Hot-Reload!"
-	tip_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	tip_lbl.add_theme_font_size_override("font_size", 11)
-	tip_lbl.add_theme_color_override("font_color", Color(1.0, 0.9, 0.65))
-	t_margin.add_child(tip_lbl)
-	vbox.add_child(tip_panel)
-
-
-func _build_player_control_column(title: String, title_col: Color, rows: Array) -> VBoxContainer:
+func _build_player_control_column(title: String, accent_color: Color, bindings: Array[Dictionary]) -> VBoxContainer:
 	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 6)
+	col.add_theme_constant_override("separation", 8)
 
 	var heading := Label.new()
 	heading.text = title
-	heading.add_theme_font_size_override("font_size", 15)
-	heading.add_theme_color_override("font_color", title_col)
+	heading.add_theme_font_size_override("font_size", 14)
+	heading.add_theme_color_override("font_color", accent_color)
 	col.add_child(heading)
 
 	var div := ColorRect.new()
 	div.custom_minimum_size = Vector2(0, 1)
-	div.color = title_col * Color(1, 1, 1, 0.35)
+	div.color = accent_color * Color(1, 1, 1, 0.3)
 	col.add_child(div)
 
-	for item in rows:
-		var row := HBoxContainer.new()
+	for item in bindings:
+		var row := VBoxContainer.new()
+		row.add_theme_constant_override("separation", 2)
+
 		var a_lbl := Label.new()
-		a_lbl.text = item["action"] + ":"
-		a_lbl.custom_minimum_size = Vector2(110, 0)
-		a_lbl.add_theme_font_size_override("font_size", 11)
-		a_lbl.add_theme_color_override("font_color", Color(0.7, 0.75, 0.85))
+		a_lbl.text = item["action"].to_upper()
+		a_lbl.add_theme_font_size_override("font_size", 10)
+		a_lbl.add_theme_color_override("font_color", accent_color * Color(1, 1, 1, 0.85))
 		row.add_child(a_lbl)
 
 		var k_lbl := Label.new()
 		k_lbl.text = item["keys"]
 		k_lbl.add_theme_font_size_override("font_size", 11)
-		k_lbl.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0))
+		k_lbl.add_theme_color_override("font_color", Color(0.9, 0.9, 0.95))
 		row.add_child(k_lbl)
 		col.add_child(row)
 
@@ -664,48 +693,24 @@ func _toggle_controls_modal(show_modal: bool) -> void:
 	if show_modal:
 		_controls_modal.modulate = Color(1, 1, 1, 0)
 		var tw := create_tween()
-		tw.tween_property(_controls_modal, "modulate", Color(1, 1, 1, 1), 0.2)
+		tw.tween_property(_controls_modal, "modulate", Color(1, 1, 1, 1), 0.15)
 	else:
 		if _buttons.size() > 0:
 			_buttons[0].grab_focus()
 
 
-# --- 5. Footer Bar -----------------------------------------------------------
+# --- 8. Scene Transitions ----------------------------------------------------
 
-func _build_footer() -> void:
-	var footer := HBoxContainer.new()
-	footer.position = Vector2(30, 616)
-	footer.size = Vector2(1092, 24)
-
-	var ver := Label.new()
-	ver.text = "MYSTIK COMBAT v1.2.0 • OFFLINE DUEL ENGINE"
-	ver.add_theme_font_size_override("font_size", 11)
-	ver.add_theme_color_override("font_color", Color(0.6, 0.65, 0.75, 0.65))
-	footer.add_child(ver)
-
-	var sp := Control.new()
-	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	footer.add_child(sp)
-
-	var hint := Label.new()
-	hint.text = "[W / S / ↑ / ↓] Navigate  •  [Enter / Space] Select  •  [Esc] Quit  •  [C] Controls"
-	hint.add_theme_font_size_override("font_size", 11)
-	hint.add_theme_color_override("font_color", Color(0.6, 0.65, 0.75, 0.65))
-	footer.add_child(hint)
-
-	add_child(footer)
-
-
-# --- Scene Transitions -------------------------------------------------------
-
-func _on_play_pressed() -> void:
+func _start_versus(is_ai: bool) -> void:
+	if has_node("/root/ArcadeManager"):
+		get_node("/root/ArcadeManager").end_arcade()
+	if has_node("/root/GameSettings"):
+		get_node("/root/GameSettings").vs_ai = is_ai
 	get_tree().change_scene_to_file("res://ui/character_select/character_select.tscn")
 
 
-func _on_quick_fight_pressed() -> void:
-	GameSettings.player1_character = "KAAL"
-	GameSettings.player2_character = "NEX"
-	get_tree().change_scene_to_file("res://Main.tscn")
+func _on_play_pressed() -> void:
+	_start_versus(false)
 
 
 func _on_quit_pressed() -> void:

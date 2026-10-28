@@ -41,6 +41,11 @@ var round_over: bool = false
 var match_over: bool = false
 var round_timer: float = 99.0
 
+# Arcade mode tracking
+var arcade_stage_time: float = 0.0
+var p1_max_combo: int = 0
+var trial_banner: Label = null
+
 var phase: String = "countdown"
 var phase_time: float = 0.0
 var countdown_number: int = 3
@@ -59,13 +64,36 @@ func get_character_data(id: String) -> CharacterData:
 
 
 func apply_character_selection() -> void:
-	var gs := _get_game_settings()
-	var p1_name: String = gs.player1_character if gs != null else "KAAL"
-	var p2_name: String = gs.player2_character if gs != null else "NEX"
-	var p1_data := get_character_data(p1_name)
-	var p2_data := get_character_data(p2_name)
-	fighter1.setup_from_data(p1_data)
-	fighter2.setup_from_data(p2_data)
+	if has_node("/root/ArcadeManager") and get_node("/root/ArcadeManager").is_arcade_active:
+		var am = get_node("/root/ArcadeManager")
+		var stage_data: Dictionary = am.get_current_stage_data()
+		var p1_name: String = am.player_character
+		var p2_name: String = String(stage_data.get("opponent_character", "NEX"))
+
+		fighter1.setup_from_data(get_character_data(p1_name))
+		fighter2.setup_from_data(get_character_data(p2_name))
+
+		fighter2.enable_ai(float(stage_data.get("ai_difficulty", 0.75)))
+		if bool(stage_data.get("is_boss", false)):
+			fighter2.setup_boss(
+				float(stage_data.get("opponent_hp", 160.0)),
+				float(stage_data.get("opponent_dmg_mult", 1.25)),
+				String(stage_data.get("opponent_title", "OVERDRIVE"))
+			)
+		else:
+			fighter2.max_health = float(stage_data.get("opponent_hp", 100.0))
+			fighter2.health = fighter2.max_health
+			fighter2.damage_multiplier = float(stage_data.get("opponent_dmg_mult", 1.0))
+
+		fighter1.damage_taken_multiplier = float(stage_data.get("player_dmg_taken_mult", 1.0))
+	else:
+		var gs := _get_game_settings()
+		var p1_name: String = gs.player1_character if gs != null else "KAAL"
+		var p2_name: String = gs.player2_character if gs != null else "NEX"
+		var p1_data := get_character_data(p1_name)
+		var p2_data := get_character_data(p2_name)
+		fighter1.setup_from_data(p1_data)
+		fighter2.setup_from_data(p2_data)
 
 
 func _setup_arena() -> void:
@@ -221,9 +249,37 @@ func _ready() -> void:
 	name_label2.position = Vector2(742, 2)
 	name_label2.size = Vector2(240, 22)
 	name_label2.add_theme_font_size_override("font_size", 16)
-	name_label2.text = "%s [%s]" % [p2_data.display_name, p2_data.archetype.to_upper()]
-	name_label2.add_theme_color_override("font_color", p2_data.accent_color)
+	if has_node("/root/ArcadeManager") and get_node("/root/ArcadeManager").is_arcade_active:
+		var stage_data: Dictionary = get_node("/root/ArcadeManager").get_current_stage_data()
+		name_label2.text = String(stage_data.get("opponent_title", p2_data.display_name))
+		if bool(stage_data.get("is_boss", false)):
+			name_label2.add_theme_color_override("font_color", Color(1.0, 0.3, 0.25))
+		else:
+			name_label2.add_theme_color_override("font_color", p2_data.accent_color)
+	else:
+		name_label2.text = "%s [%s]" % [p2_data.display_name, p2_data.archetype.to_upper()]
+		name_label2.add_theme_color_override("font_color", p2_data.accent_color)
 	hud.add_child(name_label2)
+
+	# Optional Arcade Trial Banner at top-center of screen
+	if has_node("/root/ArcadeManager") and get_node("/root/ArcadeManager").is_arcade_active:
+		var s_data: Dictionary = get_node("/root/ArcadeManager").get_current_stage_data()
+		trial_banner = Label.new()
+		trial_banner.position = Vector2(380, 2)
+		trial_banner.size = Vector2(392, 20)
+		trial_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		trial_banner.add_theme_font_size_override("font_size", 12)
+		if bool(s_data.get("is_boss", false)):
+			trial_banner.text = "⚠️ FINAL TRIAL: CLASH OF TITANS ⚠️"
+			trial_banner.add_theme_color_override("font_color", Color(1.0, 0.35, 0.2))
+		else:
+			trial_banner.text = "TRIAL %d / %d: %s" % [
+				int(s_data.get("stage", 1)),
+				int(s_data.get("total_stages", 4)),
+				String(s_data.get("name", "")).to_upper()
+			]
+			trial_banner.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3, 0.9))
+		hud.add_child(trial_banner)
 
 	hp_label2 = Label.new()
 	hp_label2.position = Vector2(952, 2)
@@ -381,6 +437,8 @@ func update_round_dots() -> void:
 func _on_combo_changed(fighter: CharacterBody2D, count: int) -> void:
 	var label: Label = combo_label1 if fighter == fighter1 else combo_label2
 	label.text = "%d HIT COMBO!" % count if count >= 2 else ""
+	if fighter == fighter1:
+		p1_max_combo = maxi(p1_max_combo, count)
 
 
 func apply_shake(intensity: float) -> void:
@@ -458,6 +516,7 @@ func _process(delta: float) -> void:
 
 	if phase == "fight":
 		round_timer = maxf(0.0, round_timer - delta)
+		arcade_stage_time += delta
 		status_label.text = "ROUND %d  |  %02d" % [
 			round_number, int(ceil(round_timer))
 		]
@@ -498,7 +557,18 @@ func _process(delta: float) -> void:
 
 		"match_result":
 			match_over = true
-			get_tree().change_scene_to_file("res://Results.tscn")
+			if has_node("/root/ArcadeManager") and get_node("/root/ArcadeManager").is_arcade_active:
+				var am = get_node("/root/ArcadeManager")
+				if round_wins[0] >= 2:
+					var has_next: bool = am.advance_stage()
+					if has_next:
+						get_tree().change_scene_to_file("res://ui/ArcadeLadder.tscn")
+					else:
+						get_tree().change_scene_to_file("res://ui/HighScoreScreen.tscn")
+				else:
+					get_tree().change_scene_to_file("res://ui/HighScoreScreen.tscn")
+			else:
+				get_tree().change_scene_to_file("res://Results.tscn")
 
 
 func _on_health_changed(
@@ -565,13 +635,26 @@ func end_round(winner: CharacterBody2D) -> void:
 		phase = "match_result"
 		phase_time = 2.5 # Show full KO animation, landing, and victory call before changing scene
 
+		var is_arcade: bool = has_node("/root/ArcadeManager") and get_node("/root/ArcadeManager").is_arcade_active
+		if is_arcade and winner_index == 0:
+			var am = get_node("/root/ArcadeManager")
+			am.record_stage_victory(fighter1.health, arcade_stage_time, p1_max_combo)
+
 		var victor_name: String = winner.character_name
 		if gs != null:
 			gs.winner_character = victor_name
 		get_tree().create_timer(1.1).timeout.connect(func():
 			if is_instance_valid(status_label):
-				status_label.text = "%s WINS!" % victor_name
-				status_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
+				if is_arcade:
+					if winner_index == 0:
+						status_label.text = "TRIAL CLEARED!"
+						status_label.add_theme_color_override("font_color", Color(0.2, 0.95, 0.4))
+					else:
+						status_label.text = "GAUNTLET FAILED!"
+						status_label.add_theme_color_override("font_color", Color(1.0, 0.25, 0.25))
+				else:
+					status_label.text = "%s WINS!" % victor_name
+					status_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
 		)
 		return
 
@@ -609,6 +692,10 @@ func prepare_round() -> void:
 	countdown_number = 3
 	phase_time = 1.0
 	round_timer = 99.0
+
+	if round_number == 1:
+		arcade_stage_time = 0.0
+		p1_max_combo = 0
 
 	fighter1.set_physics_process(false)
 	fighter2.set_physics_process(false)

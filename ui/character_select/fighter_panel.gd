@@ -90,6 +90,12 @@ func set_locked(locked: bool) -> void:
 		_tween.tween_property(_portrait, "scale", Vector2.ONE, 0.25)
 
 
+func set_tag_text(new_tag: String) -> void:
+	tag_text = new_tag
+	if _tag != null:
+		_tag.text = new_tag
+
+
 func _make_label(font_size: int, color: Color) -> Label:
 	var label := Label.new()
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

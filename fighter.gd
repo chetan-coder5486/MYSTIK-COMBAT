@@ -7,7 +7,7 @@ signal knocked_out(fighter: CharacterBody2D)
 @export var player_number: int = 1
 @export var character_name: String = "KAAL"
 @export var move_speed: float = 350.0
-@export var jump_velocity: float = -650.0
+@export var jump_velocity: float = -790.0
 @export var arena_left: float = 0.0
 @export var arena_right: float = 1152.0
 @export var max_health: float = 100.0
@@ -47,6 +47,13 @@ var original_visual_scale: Vector2 = Vector2.ONE
 var is_ai: bool = false
 var ai_controller: AIController = null
 
+# Arcade & Boss Encounter properties
+var is_boss: bool = false
+var boss_title: String = ""
+var damage_multiplier: float = 1.0
+var damage_taken_multiplier: float = 1.0
+var boss_aura_time: float = 0.0
+
 # Key buffer flags for responsive direct input
 var _key_special_pressed: bool = false
 var _key_ultimate_pressed: bool = false
@@ -82,7 +89,20 @@ func setup_from_data(data: CharacterData) -> void:
 	ki_changed.emit(self, ki, MAX_KI)
 
 
+func setup_boss(boss_hp: float, dmg_mult: float, title: String = "") -> void:
+	is_boss = true
+	boss_title = title
+	max_health = boss_hp
+	health = boss_hp
+	damage_multiplier = dmg_mult
+	health_changed.emit(self, health, max_health)
+
+
 func _ready() -> void:
+	# Collide with floor and stage barriers on mask 1, fighters operate on layer 2
+	collision_layer = 2
+	collision_mask = 1
+
 	health = max_health
 	ki = 0.0
 	floor_snap_length = 8.0
@@ -216,6 +236,8 @@ func _physics_process(delta: float) -> void:
 	stun_time = maxf(0.0, stun_time - delta)
 	hit_flash_time = maxf(0.0, hit_flash_time - delta)
 	hit_reaction_time = maxf(0.0, hit_reaction_time - delta)
+	if is_boss:
+		boss_aura_time += delta
 
 	if hit_reaction_time > 0.0:
 		body_visual.scale = original_visual_scale * Vector2(1.2, 0.8)
@@ -346,6 +368,7 @@ func _physics_process(delta: float) -> void:
 
 	move_and_slide()
 
+	_resolve_pushbox(opponent)
 	
 	update_animation()
 	
@@ -356,6 +379,44 @@ func _physics_process(delta: float) -> void:
 	)
 
 	queue_redraw()
+
+
+func _resolve_pushbox(opponent: CharacterBody2D) -> void:
+	if opponent == null or opponent.defeated or defeated:
+		return
+
+	var dx: float = global_position.x - opponent.global_position.x
+	var dy: float = absf(global_position.y - opponent.global_position.y)
+
+	# If jumping high enough over opponent, allow clean crossover without horizontal stop
+	if dy >= 70.0:
+		return
+
+	var min_dist: float = BODY_WIDTH # 60.0 px
+	var dist: float = absf(dx)
+
+	if dist < min_dist:
+		var overlap: float = min_dist - dist
+		var push_dir: float = signf(dx)
+		if push_dir == 0.0:
+			push_dir = -1.0 if player_number == 1 else 1.0
+
+		if is_on_floor() and opponent.is_on_floor():
+			global_position.x += push_dir * (overlap * 0.5)
+			opponent.global_position.x -= push_dir * (overlap * 0.5)
+		else:
+			global_position.x += push_dir * overlap
+
+		global_position.x = clampf(
+			global_position.x,
+			arena_left + BODY_WIDTH / 2.0,
+			arena_right - BODY_WIDTH / 2.0
+		)
+		opponent.global_position.x = clampf(
+			opponent.global_position.x,
+			arena_left + BODY_WIDTH / 2.0,
+			arena_right - BODY_WIDTH / 2.0
+		)
 
 
 func get_hurtbox() -> Rect2:
@@ -390,6 +451,24 @@ func find_opponent() -> CharacterBody2D:
 
 
 func _draw() -> void:
+	# Boss Dimensional Aura
+	if is_boss and not defeated:
+		var pulse: float = sin(boss_aura_time * 5.0) * 0.5 + 0.5
+		var is_kaal: bool = (character_name.to_upper() == "KAAL")
+		var aura_col: Color = Color(0.95, 0.25, 0.15, 0.4 + pulse * 0.3) if is_kaal else Color(0.15, 0.5, 1.0, 0.4 + pulse * 0.3)
+		var core_col: Color = Color(1.0, 0.85, 0.2, 0.7) if is_kaal else Color(0.6, 0.95, 1.0, 0.7)
+
+		# Ground ring
+		draw_arc(Vector2(0, BODY_HEIGHT * 0.45), 45.0 + pulse * 10.0, 0.0, TAU, 24, aura_col, 3.5)
+		draw_arc(Vector2(0, BODY_HEIGHT * 0.45), 25.0 + pulse * 5.0, 0.0, TAU, 16, core_col, 2.0)
+
+		# Orbiting dimensional wisps
+		for i in range(4):
+			var angle: float = boss_aura_time * 2.5 + float(i) * (PI * 0.5)
+			var wisp_pos := Vector2(cos(angle) * 38.0, sin(angle * 1.5) * 55.0)
+			draw_circle(wisp_pos, 4.0 + pulse * 3.0, aura_col)
+			draw_circle(wisp_pos, 2.0, core_col)
+
 	# Debug hurtbox
 	draw_rect(
 		Rect2(

@@ -22,6 +22,8 @@ script = ExtResource("1_uu6xs")
 
 [node name="Fighter1" type="CharacterBody2D" parent="." unique_id=1155618113]
 position = Vector2(250, 470)
+collision_layer = 2
+collision_mask = 1
 script = ExtResource("1_glv2v")
 
 [node name="ColorRect" type="ColorRect" parent="Fighter1" unique_id=929096672]
@@ -53,6 +55,8 @@ animation = &"idle"
 
 [node name="Fighter2" type="CharacterBody2D" parent="." unique_id=1225470398]
 position = Vector2(900, 470)
+collision_layer = 2
+collision_mask = 1
 script = ExtResource("1_glv2v")
 player_number = 2
 

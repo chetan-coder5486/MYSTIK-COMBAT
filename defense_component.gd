@@ -27,7 +27,8 @@ func take_damage(
 
 	var was_blocked: bool = fighter.blocking and attacker_is_in_front
 	var block_mult: float = move_data.get("block_damage_mult", 0.20) if move_data.size() > 0 else 0.20
-	var final_damage: float = amount
+	var dmg_taken_mult: float = fighter.damage_taken_multiplier if "damage_taken_multiplier" in fighter else 1.0
+	var final_damage: float = amount * dmg_taken_mult
 
 	if was_blocked:
 		final_damage *= block_mult

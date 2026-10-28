@@ -67,6 +67,9 @@ var _leaving: bool = false
 
 
 func _ready() -> void:
+	if has_node("/root/ArcadeManager"):
+		get_node("/root/ArcadeManager").end_arcade()
+
 	if roster.is_empty():
 		push_error("CharacterSelect: 'roster' is empty. Assign CharacterData resources in the Inspector.")
 		set_process(false)
@@ -98,7 +101,23 @@ func _ready() -> void:
 
 	_build_roster()
 	_refresh()
+	_update_mode_presentation()
 	_fade_from_black()
+
+
+func _update_mode_presentation() -> void:
+	var vs_cpu: bool = true
+	if has_node("/root/GameSettings"):
+		vs_cpu = bool(get_node("/root/GameSettings").vs_ai)
+
+	if vs_cpu:
+		_title_label.text = "SELECT YOUR FIGHTER — VS CPU"
+		_p2_panel.set_tag_text("CPU (AI)")
+		_hint_label.text = "P1: WASD MOVE • F SELECT    P2: ARROWS / ENTER    [TAB] TOGGLE P2: CPU / HUMAN"
+	else:
+		_title_label.text = "SELECT YOUR FIGHTER — LOCAL 2-PLAYER"
+		_p2_panel.set_tag_text("PLAYER 2 (HUMAN)")
+		_hint_label.text = "P1: WASD MOVE • F SELECT    P2: ARROWS / ENTER    [TAB] TOGGLE P2: CPU / HUMAN"
 
 
 func _process(_delta: float) -> void:
@@ -116,9 +135,16 @@ func _process(_delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
-	if key and key.pressed and not key.echo and key.keycode == KEY_ESCAPE:
-		_go_back()
-		get_viewport().set_input_as_handled()
+	if key and key.pressed and not key.echo:
+		if key.keycode == KEY_ESCAPE:
+			_go_back()
+			get_viewport().set_input_as_handled()
+		elif key.keycode == KEY_TAB:
+			if has_node("/root/GameSettings"):
+				var gs = get_node("/root/GameSettings")
+				gs.vs_ai = not gs.vs_ai
+				_update_mode_presentation()
+				get_viewport().set_input_as_handled()
 
 
 # --- Flow -------------------------------------------------------------------

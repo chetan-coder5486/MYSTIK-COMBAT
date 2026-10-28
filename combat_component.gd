@@ -101,7 +101,8 @@ func spawn_energy_wave(is_ult: bool) -> void:
 	energy.facing = fighter.facing
 	energy.attacker = fighter
 	energy.is_ultimate = is_ult
-	energy.damage = get_attack_damage("ultimate") if is_ult else get_attack_damage("special")
+	var dmg_mult: float = fighter.damage_multiplier if "damage_multiplier" in fighter else 1.0
+	energy.damage = (get_attack_damage("ultimate") if is_ult else get_attack_damage("special")) * dmg_mult
 	if fighter.character_name.to_upper() == "NEX":
 		energy.speed = 820.0
 	else:
@@ -142,7 +143,9 @@ func update_attack(delta: float, opponent: CharacterBody2D) -> void:
 		if not attack_has_hit and get_attack_hitbox().intersects(opponent.get_hurtbox()):
 			attack_has_hit = true
 			
-			var damage := get_attack_damage(attack_kind)
+			var base_dmg: float = get_attack_damage(attack_kind)
+			var mult: float = fighter.damage_multiplier if "damage_multiplier" in fighter else 1.0
+			var damage: float = base_dmg * mult
 			var landed: bool = opponent.take_damage(
 				damage,
 				fighter.facing,
