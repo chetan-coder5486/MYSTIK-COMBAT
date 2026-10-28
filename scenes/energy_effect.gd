@@ -84,14 +84,31 @@ func _process(delta: float) -> void:
 				_spawn_burst_particles(20)
 				
 				var kind_str := "ultimate" if is_ultimate else "special"
-				var landed: bool = opponent.take_damage(damage, facing, kind_str)
+				var move_data: Dictionary = {}
+				if has_node("/root/Grimoire"):
+					move_data = get_node("/root/Grimoire").get_move(character_name, kind_str)
+
+				var landed: bool = opponent.take_damage(damage, facing, kind_str, move_data)
 				
 				if landed:
+					var stop_frames: int = move_data.get("hit_stop_frames", 6) if move_data.size() > 0 else 6
+					if has_node("/root/HitStop"):
+						get_node("/root/HitStop").trigger(stop_frames)
+
+					var shake: float = move_data.get("screen_shake", 6.0) if move_data.size() > 0 else 6.0
+					var root: Node = _get_effects_parent()
+					if root != null and root.has_method("apply_shake"):
+						root.apply_shake(shake)
+					elif root != null and "shake_intensity" in root:
+						root.shake_intensity = maxf(root.shake_intensity, shake)
+
 					attacker.combo_component.register_hit()
-					attacker.add_ki(12.0) # +12 for successful hit
+					var ki_gain: float = move_data.get("ki_gain_on_hit", 12.0) if move_data.size() > 0 else 12.0
+					attacker.add_ki(ki_gain)
 					_spawn_hit_feedback(opponent, true)
 				else:
-					opponent.add_ki(3.0)  # +3 for successful block
+					var ki_gain_block: float = move_data.get("ki_gain_on_block", 3.0) if move_data.size() > 0 else 3.0
+					opponent.add_ki(ki_gain_block)
 					_spawn_hit_feedback(opponent, false)
 
 	queue_redraw()
@@ -142,17 +159,18 @@ func _spawn_burst_particles(count: int) -> void:
 		})
 
 
-func _spawn_hit_feedback(opponent: CharacterBody2D, landed: bool) -> void:
-	var scene_root: Node = null
+func _get_effects_parent() -> Node:
 	if is_inside_tree():
 		var tree := get_tree()
 		if tree != null and tree.current_scene != null:
-			scene_root = tree.current_scene
-		elif get_parent() != null:
-			scene_root = get_parent()
-	elif get_parent() != null:
-		scene_root = get_parent()
+			return tree.current_scene
+	if get_parent() != null:
+		return get_parent()
+	return null
 
+
+func _spawn_hit_feedback(opponent: CharacterBody2D, landed: bool) -> void:
+	var scene_root: Node = _get_effects_parent()
 	if scene_root == null:
 		return
 

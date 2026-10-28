@@ -15,8 +15,11 @@ const NEX_PORTRAIT: Texture2D = preload(
 )
 
 func _ready() -> void:
+	if GameSettings != null and GameSettings.has_method("play_menu_music"):
+		GameSettings.play_menu_music()
 	rematch_button.pressed.connect(_on_rematch_pressed)
 	main_menu_button.pressed.connect(_on_main_menu_pressed)
+
 
 	var winner: String = GameSettings.winner_character
 	winner_name.text = winner + " WINS!"

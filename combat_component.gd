@@ -38,6 +38,7 @@ const ENERGY_EFFECT_SCENE: PackedScene = preload("res://scenes/energy_effect.tsc
 var attack_kind: String = ""
 var attack_time: float = 0.0
 var attack_has_hit: bool = false
+var current_move: Dictionary = {}
 
 var fighter: CharacterBody2D
 
@@ -50,12 +51,16 @@ func start_attack(kind: String) -> void:
 	if fighter.defeated:
 		return
 
+	if has_node("/root/Grimoire"):
+		current_move = get_node("/root/Grimoire").get_move(fighter.character_name, kind)
+	else:
+		current_move = {}
+
+	var ki_cost: float = current_move.get("ki_cost", 0.0) if current_move.size() > 0 else (SPECIAL_KI_COST if kind == "special" else (ULTIMATE_KI_COST if kind == "ultimate" else 0.0))
+
 	# Resource checks for Special and Ultimate
-	if kind == "special":
-		if not fighter.spend_ki(SPECIAL_KI_COST):
-			return
-	elif kind == "ultimate":
-		if not fighter.spend_ki(ULTIMATE_KI_COST):
+	if ki_cost > 0.0:
+		if not fighter.spend_ki(ki_cost):
 			return
 
 	attack_kind = kind
@@ -65,11 +70,12 @@ func start_attack(kind: String) -> void:
 
 	# Play matching attack animation scaled to character attack speed
 	if fighter.animated_sprite != null:
-		var animation_name := ""
-		if kind == "light":
-			animation_name = "light_attack"
-		elif kind in ["heavy", "special", "ultimate"]:
-			animation_name = "heavy_attack"
+		var animation_name: String = str(current_move.get("animation", "")) if current_move.size() > 0 else ""
+		if animation_name == "":
+			if kind == "light":
+				animation_name = "light_attack"
+			elif kind in ["heavy", "special", "ultimate"]:
+				animation_name = "heavy_attack"
 
 		if (
 			animation_name != ""
@@ -107,7 +113,7 @@ func spawn_energy_wave(is_ult: bool) -> void:
 	var spawn_y: float = fighter.global_position.y - 12.0
 	energy.global_position = Vector2(spawn_x, spawn_y)
 	
-	var scene_root := _get_effects_parent()
+	var scene_root: Node = _get_effects_parent()
 	if scene_root != null:
 		scene_root.add_child(energy)
 
@@ -140,15 +146,25 @@ func update_attack(delta: float, opponent: CharacterBody2D) -> void:
 			var landed: bool = opponent.take_damage(
 				damage,
 				fighter.facing,
-				attack_kind
+				attack_kind,
+				current_move
 			)
 
 			if landed:
+				var stop_frames: int = current_move.get("hit_stop_frames", 4) if current_move.size() > 0 else 4
+				if has_node("/root/HitStop"):
+					get_node("/root/HitStop").trigger(stop_frames)
+
+				var shake: float = current_move.get("screen_shake", 0.0) if current_move.size() > 0 else 0.0
+				_apply_screen_shake(shake)
+
+				var ki_gain: float = current_move.get("ki_gain_on_hit", 12.0) if current_move.size() > 0 else 12.0
 				fighter.combo_component.register_hit()
-				fighter.add_ki(12.0) # +12 Ki for a successful hit
+				fighter.add_ki(ki_gain)
 				spawn_hit_effect(opponent)
 			else:
-				opponent.add_ki(3.0)  # +3 Ki for a successful block
+				var ki_gain_block: float = current_move.get("ki_gain_on_block", 3.0) if current_move.size() > 0 else 3.0
+				opponent.add_ki(ki_gain_block)
 				spawn_block_effect(opponent)
 
 	if attack_time >= startup + active + recovery:
@@ -158,35 +174,26 @@ func update_attack(delta: float, opponent: CharacterBody2D) -> void:
 
 
 func get_startup_time(kind: String) -> float:
-	var base := LIGHT_STARTUP
-	match kind:
-		"light": base = LIGHT_STARTUP
-		"heavy": base = HEAVY_STARTUP
-		"special": base = SPECIAL_STARTUP
-		"ultimate": base = ULTIMATE_STARTUP
-		_: base = LIGHT_STARTUP
+	var move: Dictionary = current_move if current_move.size() > 0 and attack_kind == kind else (
+		get_node("/root/Grimoire").get_move(fighter.character_name, kind) if has_node("/root/Grimoire") else {}
+	)
+	var base: float = move.get("startup", LIGHT_STARTUP) if move.size() > 0 else LIGHT_STARTUP
 	return base / maxf(0.1, attack_speed_scale)
 
 
 func get_active_time(kind: String) -> float:
-	var base := LIGHT_ACTIVE
-	match kind:
-		"light": base = LIGHT_ACTIVE
-		"heavy": base = HEAVY_ACTIVE
-		"special": base = SPECIAL_ACTIVE
-		"ultimate": base = ULTIMATE_ACTIVE
-		_: base = LIGHT_ACTIVE
+	var move: Dictionary = current_move if current_move.size() > 0 and attack_kind == kind else (
+		get_node("/root/Grimoire").get_move(fighter.character_name, kind) if has_node("/root/Grimoire") else {}
+	)
+	var base: float = move.get("active", LIGHT_ACTIVE) if move.size() > 0 else LIGHT_ACTIVE
 	return base / maxf(0.1, attack_speed_scale)
 
 
 func get_recovery_time(kind: String) -> float:
-	var base := LIGHT_RECOVERY
-	match kind:
-		"light": base = LIGHT_RECOVERY
-		"heavy": base = HEAVY_RECOVERY
-		"special": base = SPECIAL_RECOVERY
-		"ultimate": base = ULTIMATE_RECOVERY
-		_: base = LIGHT_RECOVERY
+	var move: Dictionary = current_move if current_move.size() > 0 and attack_kind == kind else (
+		get_node("/root/Grimoire").get_move(fighter.character_name, kind) if has_node("/root/Grimoire") else {}
+	)
+	var base: float = move.get("recovery", LIGHT_RECOVERY) if move.size() > 0 else LIGHT_RECOVERY
 	return base / maxf(0.1, attack_speed_scale)
 
 
@@ -215,6 +222,7 @@ func cancel_attack() -> void:
 	attack_kind = ""
 	attack_time = 0.0
 	attack_has_hit = false
+	current_move = {}
 	if fighter != null and fighter.animated_sprite != null:
 		fighter.animated_sprite.speed_scale = 1.0
 	if previous_kind != "":
@@ -225,20 +233,24 @@ func cancel_attack() -> void:
 func get_attack_hitbox() -> Rect2:
 	var reach: float = 55.0
 	var hit_height: float = 42.0
-	
-	match attack_kind:
-		"heavy":
-			reach = 72.0
-			hit_height = 54.0
-		"special":
-			reach = 76.0
-			hit_height = 62.0
-		"ultimate":
-			reach = 90.0
-			hit_height = 76.0
-		_: # light
-			reach = 55.0
-			hit_height = 42.0
+
+	if current_move.size() > 0:
+		reach = current_move.get("reach", 55.0)
+		hit_height = current_move.get("hit_height", 42.0)
+	else:
+		match attack_kind:
+			"heavy":
+				reach = 72.0
+				hit_height = 54.0
+			"special":
+				reach = 76.0
+				hit_height = 62.0
+			"ultimate":
+				reach = 90.0
+				hit_height = 76.0
+			_: # light
+				reach = 55.0
+				hit_height = 42.0
 
 	var hit_y: float = fighter.global_position.y - 20.0 - hit_height * 0.5
 	var hit_x: float
@@ -250,12 +262,22 @@ func get_attack_hitbox() -> Rect2:
 	return Rect2(hit_x, hit_y, reach, hit_height)
 
 
+func _apply_screen_shake(intensity: float) -> void:
+	if intensity <= 0.0:
+		return
+	var scene_root: Node = _get_effects_parent()
+	if scene_root != null and scene_root.has_method("apply_shake"):
+		scene_root.apply_shake(intensity)
+	elif scene_root != null and "shake_intensity" in scene_root:
+		scene_root.shake_intensity = maxf(scene_root.shake_intensity, intensity)
+
+
 func is_attack_active() -> bool:
 	if attack_kind == "":
 		return false
 
-	var startup := get_startup_time(attack_kind)
-	var active := get_active_time(attack_kind)
+	var startup: float = get_startup_time(attack_kind)
+	var active: float = get_active_time(attack_kind)
 
 	return attack_time >= startup and attack_time < startup + active
 
@@ -277,7 +299,7 @@ func _get_effects_parent() -> Node:
 
 
 func spawn_hit_effect(opponent: CharacterBody2D) -> void:
-	var scene_root := _get_effects_parent()
+	var scene_root: Node = _get_effects_parent()
 	if scene_root == null:
 		return
 
@@ -290,7 +312,7 @@ func spawn_hit_effect(opponent: CharacterBody2D) -> void:
 
 
 func spawn_block_effect(opponent: CharacterBody2D) -> void:
-	var scene_root := _get_effects_parent()
+	var scene_root: Node = _get_effects_parent()
 	if scene_root == null:
 		return
 

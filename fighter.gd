@@ -22,6 +22,8 @@ var health: float
 var ki: float = 0.0
 var facing: float = 1.0
 var stun_time: float = 0.0
+var hit_stop_time: float = 0.0
+var _was_hit_stopped: bool = false
 var hit_flash_time: float = 0.0
 var blocking: bool = false
 var defeated: bool = false
@@ -41,6 +43,9 @@ const ULTIMATE_ATTACK_COLOR := Color(1.0, 0.95, 0.2)# Gold
 
 var hit_reaction_time: float = 0.0
 var original_visual_scale: Vector2 = Vector2.ONE
+
+var is_ai: bool = false
+var ai_controller: AIController = null
 
 # Key buffer flags for responsive direct input
 var _key_special_pressed: bool = false
@@ -99,6 +104,20 @@ func _ready() -> void:
 	body_visual.pivot_offset = body_visual.size / 2.0
 	original_visual_scale = body_visual.scale
 
+	if player_number == 2:
+		var gs = get_node_or_null("/root/GameSettings")
+		if gs and gs.get("vs_ai"):
+			enable_ai(gs.get("ai_difficulty"))
+
+
+func enable_ai(diff: float = 0.85) -> void:
+	is_ai = true
+	if ai_controller == null:
+		ai_controller = AIController.new()
+		ai_controller.name = "AIController"
+		ai_controller.difficulty = diff
+		add_child(ai_controller)
+
 
 
 func add_ki(amount: float) -> void:
@@ -117,6 +136,8 @@ func spend_ki(amount: float) -> bool:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if is_ai:
+		return
 	if not (event is InputEventKey):
 		return
 	if not event.is_pressed() or event.is_echo():
@@ -149,9 +170,34 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if hit_stop_time > 0.0:
+		hit_stop_time = maxf(0.0, hit_stop_time - delta)
+		_was_hit_stopped = true
+		if animated_sprite != null and animated_sprite.is_playing():
+			animated_sprite.pause()
+		velocity.x = move_toward(velocity.x, 0.0, 1600.0 * delta)
+		if not is_on_floor():
+			velocity.y += GRAVITY * delta
+		move_and_slide()
+		return
+
+	if _was_hit_stopped:
+		_was_hit_stopped = false
+		if animated_sprite != null and not animated_sprite.is_playing() and not blocking:
+			animated_sprite.play()
+
 	if defeated:
+		hit_stop_time = 0.0
 		combat_component.cancel_attack()
 		blocking = false
+
+		if animated_sprite != null:
+			if animated_sprite.animation != "ko":
+				var frames: SpriteFrames = animated_sprite.sprite_frames
+				if frames != null and frames.has_animation("ko"):
+					animated_sprite.play("ko")
+			elif not animated_sprite.is_playing() and animated_sprite.frame < 3:
+				animated_sprite.play()
 
 		velocity.x = move_toward(velocity.x, 0.0, 900.0 * delta)
 
@@ -202,12 +248,20 @@ func _physics_process(delta: float) -> void:
 
 	var opponent := find_opponent()
 
-	blocking = (
-		Input.is_action_pressed(block_action)
-		and is_on_floor()
-		and combat_component.attack_kind == ""
-		and stun_time == 0.0
-	)
+	if is_ai and ai_controller:
+		blocking = (
+			ai_controller.want_block
+			and is_on_floor()
+			and combat_component.attack_kind == ""
+			and stun_time == 0.0
+		)
+	else:
+		blocking = (
+			Input.is_action_pressed(block_action)
+			and is_on_floor()
+			and combat_component.attack_kind == ""
+			and stun_time == 0.0
+		)
 
 	# Coyote time & jump buffer management
 	if is_on_floor():
@@ -230,7 +284,15 @@ func _physics_process(delta: float) -> void:
 		_key_ultimate_pressed = false
 
 	else:
-		var direction := Input.get_axis(left_action, right_action)
+		var direction := 0.0
+		if is_ai and ai_controller:
+			direction = ai_controller.move_axis
+			if ai_controller.want_jump:
+				jump_buffer_timer = JUMP_BUFFER_DURATION
+		else:
+			direction = Input.get_axis(left_action, right_action)
+			if Input.is_action_just_pressed(jump_action):
+				jump_buffer_timer = JUMP_BUFFER_DURATION
 
 		# Always face opponent
 		if opponent != null:
@@ -241,26 +303,35 @@ func _physics_process(delta: float) -> void:
 		update_facing_visual()
 		velocity.x = direction * move_speed
 
-		# Check both action event and buffered jump
-		if Input.is_action_just_pressed(jump_action):
-			jump_buffer_timer = JUMP_BUFFER_DURATION
-
 		if jump_buffer_timer > 0.0 and (is_on_floor() or coyote_timer > 0.0):
 			velocity.y = jump_velocity
 			jump_buffer_timer = 0.0
 			coyote_timer = 0.0
 
 		if not blocking:
-			var want_ultimate: bool = Input.is_action_just_pressed(ultimate_action) or _key_ultimate_pressed
-			var want_special: bool = Input.is_action_just_pressed(special_action) or _key_special_pressed
+			var want_ultimate: bool = false
+			var want_special: bool = false
+			var want_light: bool = false
+			var want_heavy: bool = false
+
+			if is_ai and ai_controller:
+				want_ultimate = ai_controller.want_ultimate
+				want_special = ai_controller.want_special
+				want_light = ai_controller.want_light
+				want_heavy = ai_controller.want_heavy
+			else:
+				want_ultimate = Input.is_action_just_pressed(ultimate_action) or _key_ultimate_pressed
+				want_special = Input.is_action_just_pressed(special_action) or _key_special_pressed
+				want_light = Input.is_action_just_pressed(light_action)
+				want_heavy = Input.is_action_just_pressed(heavy_action)
 
 			if want_ultimate and ki >= 100.0:
 				combat_component.start_attack("ultimate")
 			elif want_special and ki >= 40.0:
 				combat_component.start_attack("special")
-			elif Input.is_action_just_pressed(light_action):
+			elif want_light:
 				combat_component.start_attack("light")
-			elif Input.is_action_just_pressed(heavy_action):
+			elif want_heavy:
 				combat_component.start_attack("heavy")
 
 		_key_special_pressed = false
@@ -299,12 +370,14 @@ func get_hurtbox() -> Rect2:
 func take_damage(
 	amount: float,
 	attacker_facing: float,
-	kind: String
+	kind: String,
+	move_data: Dictionary = {}
 ) -> bool:
 	return $DefenseComponent.take_damage(
 		amount,
 		attacker_facing,
-		kind
+		kind,
+		move_data
 	)
 
 

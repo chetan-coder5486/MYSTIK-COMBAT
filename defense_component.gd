@@ -10,7 +10,8 @@ func _ready() -> void:
 func take_damage(
 	amount: float,
 	attacker_facing: float,
-	kind: String
+	kind: String,
+	move_data: Dictionary = {}
 ) -> bool:
 	if fighter.defeated:
 		return false
@@ -25,31 +26,38 @@ func take_damage(
 		)
 
 	var was_blocked: bool = fighter.blocking and attacker_is_in_front
+	var block_mult: float = move_data.get("block_damage_mult", 0.20) if move_data.size() > 0 else 0.20
 	var final_damage: float = amount
 
 	if was_blocked:
-		final_damage *= 0.20
+		final_damage *= block_mult
 	else:
-		match kind:
-			"ultimate":
-				fighter.stun_time = 0.65
-				fighter.velocity.x = attacker_facing * 520.0
-				fighter.velocity.y = -140.0
-			"special":
-				fighter.stun_time = 0.42
-				fighter.velocity.x = attacker_facing * 380.0
-				if fighter.is_on_floor():
-					fighter.velocity.y = -90.0
-			"heavy":
-				fighter.stun_time = 0.38
-				fighter.velocity.x = attacker_facing * 320.0
-				if fighter.is_on_floor():
-					fighter.velocity.y = -80.0
-			_: # light
-				fighter.stun_time = 0.22
-				fighter.velocity.x = attacker_facing * 180.0
-				if fighter.is_on_floor():
-					fighter.velocity.y = -60.0
+		if move_data.size() > 0:
+			fighter.stun_time = move_data.get("stun_time", 0.22)
+			fighter.velocity.x = attacker_facing * move_data.get("knockback_x", 180.0)
+			if fighter.is_on_floor():
+				fighter.velocity.y = move_data.get("knockback_y", -60.0)
+		else:
+			match kind:
+				"ultimate":
+					fighter.stun_time = 0.65
+					fighter.velocity.x = attacker_facing * 520.0
+					fighter.velocity.y = -140.0
+				"special":
+					fighter.stun_time = 0.42
+					fighter.velocity.x = attacker_facing * 380.0
+					if fighter.is_on_floor():
+						fighter.velocity.y = -90.0
+				"heavy":
+					fighter.stun_time = 0.38
+					fighter.velocity.x = attacker_facing * 320.0
+					if fighter.is_on_floor():
+						fighter.velocity.y = -80.0
+				_: # light
+					fighter.stun_time = 0.22
+					fighter.velocity.x = attacker_facing * 180.0
+					if fighter.is_on_floor():
+						fighter.velocity.y = -60.0
 
 	fighter.health = maxf(0.0, fighter.health - final_damage)
 

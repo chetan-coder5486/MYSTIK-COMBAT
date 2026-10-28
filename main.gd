@@ -32,6 +32,9 @@ var ultimate_banner_label: Label
 var ultimate_sub_label: Label
 var is_cinematic_active: bool = false
 
+var frame_data_inspector: FrameDataInspector
+var ai_debug_overlay: AIDebugOverlay
+
 var round_number: int = 1
 var round_wins: Array[int] = [0, 0]
 var round_over: bool = false
@@ -165,6 +168,11 @@ func _ready() -> void:
 	apply_character_selection()
 	_setup_arena()
 
+	var gs := _get_game_settings()
+	if gs != null and gs.has_method("play_battle_music"):
+		gs.play_battle_music()
+
+
 	# Camera setup for screen shake & dramatic zoom
 	camera = Camera2D.new()
 	camera.position = default_camera_pos
@@ -285,9 +293,22 @@ func _ready() -> void:
 	controls_hint.size = Vector2(1152, 22)
 	controls_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	controls_hint.add_theme_font_size_override("font_size", 12)
-	controls_hint.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.45))
-	controls_hint.text = "P1: WASD Move/Jump • F Light • G Heavy • Q Special • E Ult   |   P2: Arrows / IJKL / Numpad • / Light • . Heavy • Shift Special • Enter Ult"
+	controls_hint.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.6))
+	var p2_ctrl_hint: String = "AI (Adaptive)" if (fighter2 and fighter2.is_ai) else "Arrows/IJKL • / Light • . Heavy"
+	controls_hint.text = "P1: WASD Move • F Light • G Heavy • Q Spcl • E Ult  |  P2: %s  |  [F1] Frame Inspector  [F2] AI Brain  [F5] Hot-Reload" % p2_ctrl_hint
 	hud.add_child(controls_hint)
+
+	# Frame Data Inspector & Adaptive AI Overlay
+	frame_data_inspector = FrameDataInspector.new()
+	frame_data_inspector.name = "FrameDataInspector"
+	add_child(frame_data_inspector)
+	frame_data_inspector.set_fighters(fighter1, fighter2)
+
+	ai_debug_overlay = AIDebugOverlay.new()
+	ai_debug_overlay.name = "AIDebugOverlay"
+	add_child(ai_debug_overlay)
+	if fighter2.ai_controller != null:
+		ai_debug_overlay.set_ai_controller(fighter2.ai_controller)
 
 	# Cinematic Ultimate Overlay
 	_setup_ultimate_overlay(hud)
@@ -360,6 +381,10 @@ func update_round_dots() -> void:
 func _on_combo_changed(fighter: CharacterBody2D, count: int) -> void:
 	var label: Label = combo_label1 if fighter == fighter1 else combo_label2
 	label.text = "%d HIT COMBO!" % count if count >= 2 else ""
+
+
+func apply_shake(intensity: float) -> void:
+	shake_intensity = maxf(shake_intensity, intensity)
 
 
 func _on_attack_started(kind: String) -> void:
@@ -595,11 +620,15 @@ func prepare_round() -> void:
 		fighter.defeated = false
 		fighter.blocking = false
 		fighter.stun_time = 0.0
+		fighter.hit_stop_time = 0.0
 		fighter.hit_flash_time = 0.0
 		fighter.hit_reaction_time = 0.0
 		fighter.velocity = Vector2.ZERO
 		fighter.combat_component.cancel_attack()
 		fighter.combo_component.reset()
+
+	if fighter2.ai_controller != null:
+		fighter2.ai_controller.reset()
 
 	fighter1.global_position = Vector2(250, 470)
 	fighter2.global_position = Vector2(900, 470)

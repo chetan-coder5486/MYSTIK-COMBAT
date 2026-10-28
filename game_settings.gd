@@ -5,10 +5,160 @@ var player2_character: String = "NEX"
 var winner_character: String = "KAAL"
 var player1_round_wins: int = 0
 var player2_round_wins: int = 0
+var vs_ai: bool = true
+var ai_difficulty: float = 0.85
+
+var bgm_player: AudioStreamPlayer = null
+var current_bgm_track: String = ""
+
+const MENU_MUSIC_PATHS: Array[String] = [
+	"res://assets/audio/menu_theme.ogg",
+	"res://assets/audio/menu_theme.mp3",
+	"res://assets/audio/menu_theme.wav",
+	"res://assets/audio/menu.ogg",
+	"res://assets/audio/menu.mp3",
+]
+
+const BATTLE_MUSIC_PATHS: Array[String] = [
+	"res://assets/audio/battle_theme.ogg",
+	"res://assets/audio/battle_theme.mp3",
+	"res://assets/audio/battle_theme.wav",
+	"res://assets/audio/battle.ogg",
+	"res://assets/audio/battle.mp3",
+]
 
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	ensure_input_mappings()
+	_setup_audio()
+	play_menu_music()
+
+
+func _setup_audio() -> void:
+	if bgm_player == null:
+		bgm_player = AudioStreamPlayer.new()
+		bgm_player.name = "BgmPlayer"
+		bgm_player.bus = "Master"
+		bgm_player.process_mode = Node.PROCESS_MODE_ALWAYS
+		add_child(bgm_player)
+
+
+func play_menu_music() -> void:
+	_play_track("menu", MENU_MUSIC_PATHS, true)
+
+
+func play_battle_music() -> void:
+	_play_track("battle", BATTLE_MUSIC_PATHS, false)
+
+
+func stop_music() -> void:
+	if bgm_player != null and bgm_player.playing:
+		bgm_player.stop()
+		current_bgm_track = ""
+
+
+func set_music_volume(volume_db: float) -> void:
+	if bgm_player != null:
+		bgm_player.volume_db = volume_db
+
+
+func _play_track(track_name: String, path_candidates: Array[String], is_menu: bool) -> void:
+	_setup_audio()
+	if current_bgm_track == track_name and bgm_player.playing:
+		return
+	
+	current_bgm_track = track_name
+	
+	# Check if user placed an audio file in assets/audio/
+	var found_stream: AudioStream = null
+	for path in path_candidates:
+		if ResourceLoader.exists(path):
+			found_stream = load(path)
+			if found_stream != null:
+				if found_stream is AudioStreamOggVorbis:
+					found_stream.loop = true
+				elif found_stream is AudioStreamMP3:
+					found_stream.loop = true
+				break
+	
+	if found_stream != null:
+		_crossfade_to_stream(found_stream, -6.0)
+	else:
+		# Procedural cyber/mystic combat loop fallback
+		var synth_stream := _generate_procedural_bgm(is_menu)
+		_crossfade_to_stream(synth_stream, -10.0)
+
+
+func _crossfade_to_stream(new_stream: AudioStream, target_volume_db: float = -6.0) -> void:
+	if bgm_player.playing:
+		var tw := create_tween()
+		tw.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+		tw.tween_property(bgm_player, "volume_db", -40.0, 0.35)
+		tw.tween_callback(func():
+			bgm_player.stream = new_stream
+			bgm_player.play()
+			var tw_in := create_tween()
+			tw_in.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+			tw_in.tween_property(bgm_player, "volume_db", target_volume_db, 0.5)
+		)
+	else:
+		bgm_player.stream = new_stream
+		bgm_player.volume_db = target_volume_db
+		bgm_player.play()
+
+
+func _generate_procedural_bgm(is_menu: bool) -> AudioStreamWAV:
+	var stream := AudioStreamWAV.new()
+	stream.format = AudioStreamWAV.FORMAT_16_BITS
+	var mix_rate := 22050
+	stream.mix_rate = mix_rate
+	stream.stereo = false
+	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	
+	var duration: float = 4.8 if is_menu else 3.55
+	var total_samples := int(mix_rate * duration)
+	stream.loop_end = total_samples
+	
+	var bytes := PackedByteArray()
+	bytes.resize(total_samples * 2)
+	
+	var base_freq: float = 55.0 if is_menu else 65.4
+	var tempo_freq: float = 1.0 / (duration / 8.0)
+	
+	for i in range(total_samples):
+		var t := float(i) / float(mix_rate)
+		var beat_phase := fposmod(t * tempo_freq, 1.0)
+		
+		var note_offset := 0.0
+		var beat_idx := int(t * tempo_freq) % 8
+		if not is_menu:
+			var scale_notes = [0.0, 3.0, 5.0, 7.0, 10.0, 7.0, 5.0, 3.0]
+			note_offset = scale_notes[beat_idx]
+		else:
+			var ambient_notes = [0.0, 0.0, 7.0, 7.0, 5.0, 5.0, 3.0, 2.0]
+			note_offset = ambient_notes[beat_idx]
+		
+		var freq: float = base_freq * pow(2.0, note_offset / 12.0)
+		var bass := (sin(t * freq * TAU) + 0.3 * sin(t * freq * 2.0 * TAU)) * exp(-beat_phase * 2.5)
+		
+		var kick_env := exp(-beat_phase * 16.0)
+		var kick := sin(beat_phase * 60.0 * TAU) * kick_env * (0.4 if not is_menu else 0.2)
+		
+		var sub_beat := fposmod(t * tempo_freq * 2.0, 1.0)
+		var hat_env := exp(-sub_beat * 32.0)
+		var noise := (sin(t * 4321.0) + sin(t * 8765.0)) * 0.5 * hat_env * 0.12
+		
+		var pad_freq := base_freq * 4.0
+		var pad := (sin(t * pad_freq * TAU) * 0.08 + sin(t * pad_freq * 1.5 * TAU) * 0.06)
+		
+		var sample_val: float = clampf(bass * 0.35 + kick + noise + pad, -1.0, 1.0)
+		var sample_int := int(sample_val * 28000.0)
+		bytes.encode_s16(i * 2, sample_int)
+		
+	stream.data = bytes
+	return stream
+
 
 
 func ensure_input_mappings() -> void:

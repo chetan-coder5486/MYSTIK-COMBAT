@@ -74,6 +74,9 @@ func _ready() -> void:
 		return
 
 	_ensure_input_actions()
+	if GameSettings != null and GameSettings.has_method("play_menu_music"):
+		GameSettings.play_menu_music()
+
 
 	_model = SelectionModel.new(roster.size(), columns, allow_mirror_match)
 	_model.cursor_moved.connect(_on_cursor_moved)
