@@ -23,8 +23,14 @@ const SPECIAL_KI_COST := 40.0
 const ULTIMATE_STARTUP := 0.35
 const ULTIMATE_ACTIVE := 0.30
 const ULTIMATE_RECOVERY := 0.48
-const ULTIMATE_DAMAGE := 48.0  # 3.0x normal heavy damage (enhanced cinematic damage)
 const ULTIMATE_KI_COST := 100.0
+
+# Dynamic character attributes (configured per fighter)
+var light_damage: float = 8.0
+var heavy_damage: float = 16.0
+var special_damage: float = 24.0
+var ultimate_damage: float = 48.0
+var attack_speed_scale: float = 1.0
 
 const HIT_EFFECT_SCENE: PackedScene = preload("res://scenes/hit_effect.tscn")
 const ENERGY_EFFECT_SCENE: PackedScene = preload("res://scenes/energy_effect.tscn")
@@ -57,7 +63,7 @@ func start_attack(kind: String) -> void:
 	attack_has_hit = false
 	attack_started.emit(kind)
 
-	# Play matching attack animation
+	# Play matching attack animation scaled to character attack speed
 	if fighter.animated_sprite != null:
 		var animation_name := ""
 		if kind == "light":
@@ -70,6 +76,7 @@ func start_attack(kind: String) -> void:
 			and fighter.animated_sprite.sprite_frames != null
 			and fighter.animated_sprite.sprite_frames.has_animation(animation_name)
 		):
+			fighter.animated_sprite.speed_scale = attack_speed_scale
 			fighter.animated_sprite.play(animation_name)
 
 	# Special attack launches energy wave projectile
@@ -88,7 +95,11 @@ func spawn_energy_wave(is_ult: bool) -> void:
 	energy.facing = fighter.facing
 	energy.attacker = fighter
 	energy.is_ultimate = is_ult
-	energy.damage = ULTIMATE_DAMAGE if is_ult else SPECIAL_DAMAGE
+	energy.damage = get_attack_damage("ultimate") if is_ult else get_attack_damage("special")
+	if fighter.character_name.to_upper() == "NEX":
+		energy.speed = 820.0
+	else:
+		energy.speed = 620.0
 	energy.arena_left = fighter.arena_left
 	energy.arena_right = fighter.arena_right
 	
@@ -147,39 +158,45 @@ func update_attack(delta: float, opponent: CharacterBody2D) -> void:
 
 
 func get_startup_time(kind: String) -> float:
+	var base := LIGHT_STARTUP
 	match kind:
-		"light": return LIGHT_STARTUP
-		"heavy": return HEAVY_STARTUP
-		"special": return SPECIAL_STARTUP
-		"ultimate": return ULTIMATE_STARTUP
-		_: return LIGHT_STARTUP
+		"light": base = LIGHT_STARTUP
+		"heavy": base = HEAVY_STARTUP
+		"special": base = SPECIAL_STARTUP
+		"ultimate": base = ULTIMATE_STARTUP
+		_: base = LIGHT_STARTUP
+	return base / maxf(0.1, attack_speed_scale)
 
 
 func get_active_time(kind: String) -> float:
+	var base := LIGHT_ACTIVE
 	match kind:
-		"light": return LIGHT_ACTIVE
-		"heavy": return HEAVY_ACTIVE
-		"special": return SPECIAL_ACTIVE
-		"ultimate": return ULTIMATE_ACTIVE
-		_: return LIGHT_ACTIVE
+		"light": base = LIGHT_ACTIVE
+		"heavy": base = HEAVY_ACTIVE
+		"special": base = SPECIAL_ACTIVE
+		"ultimate": base = ULTIMATE_ACTIVE
+		_: base = LIGHT_ACTIVE
+	return base / maxf(0.1, attack_speed_scale)
 
 
 func get_recovery_time(kind: String) -> float:
+	var base := LIGHT_RECOVERY
 	match kind:
-		"light": return LIGHT_RECOVERY
-		"heavy": return HEAVY_RECOVERY
-		"special": return SPECIAL_RECOVERY
-		"ultimate": return ULTIMATE_RECOVERY
-		_: return LIGHT_RECOVERY
+		"light": base = LIGHT_RECOVERY
+		"heavy": base = HEAVY_RECOVERY
+		"special": base = SPECIAL_RECOVERY
+		"ultimate": base = ULTIMATE_RECOVERY
+		_: base = LIGHT_RECOVERY
+	return base / maxf(0.1, attack_speed_scale)
 
 
 func get_attack_damage(kind: String) -> float:
 	match kind:
-		"light": return LIGHT_DAMAGE
-		"heavy": return HEAVY_DAMAGE
-		"special": return SPECIAL_DAMAGE
-		"ultimate": return ULTIMATE_DAMAGE
-		_: return LIGHT_DAMAGE
+		"light": return light_damage
+		"heavy": return heavy_damage
+		"special": return special_damage
+		"ultimate": return ultimate_damage
+		_: return light_damage
 
 
 func finish_attack_if_ready() -> void:
@@ -198,6 +215,8 @@ func cancel_attack() -> void:
 	attack_kind = ""
 	attack_time = 0.0
 	attack_has_hit = false
+	if fighter != null and fighter.animated_sprite != null:
+		fighter.animated_sprite.speed_scale = 1.0
 	if previous_kind != "":
 		attack_ended.emit(previous_kind)
 	fighter.queue_redraw()

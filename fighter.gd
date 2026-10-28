@@ -46,6 +46,27 @@ var _key_special_pressed: bool = false
 var _key_ultimate_pressed: bool = false
 
 
+func setup_from_data(data: CharacterData) -> void:
+	character_name = data.id
+	max_health = data.max_health
+	health = data.max_health
+	move_speed = data.move_speed
+	jump_velocity = data.jump_velocity
+	if combat_component:
+		combat_component.light_damage = data.light_damage
+		combat_component.heavy_damage = data.heavy_damage
+		combat_component.special_damage = data.special_damage
+		combat_component.ultimate_damage = data.ultimate_damage
+		combat_component.attack_speed_scale = data.attack_speed_scale
+	if animated_sprite:
+		var kaal_frames = preload("res://kaal_frames.tres")
+		var nex_frames = preload("res://nex_frames.tres")
+		animated_sprite.sprite_frames = kaal_frames if data.id == "KAAL" else nex_frames
+		animated_sprite.play("idle")
+	health_changed.emit(self, health, max_health)
+	ki_changed.emit(self, ki, MAX_KI)
+
+
 func _ready() -> void:
 	health = max_health
 	ki = 0.0
