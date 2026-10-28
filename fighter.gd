@@ -13,8 +13,9 @@ signal knocked_out(fighter: CharacterBody2D)
 @export var max_health: float = 100.0
 
 const GRAVITY: float = 1600.0
-const BODY_WIDTH: float = 40.0
-const BODY_HEIGHT: float = 100.0
+const BODY_WIDTH: float = 60.0
+const BODY_HEIGHT: float = 160.0
+const SPRITE_SCALE := Vector2(0.26, 0.26)
 const MAX_KI: float = 100.0
 
 var health: float
@@ -45,6 +46,13 @@ var original_visual_scale: Vector2 = Vector2.ONE
 var _key_special_pressed: bool = false
 var _key_ultimate_pressed: bool = false
 
+# Jump buffer and coyote time to guarantee responsive jumps without frame drops
+const JUMP_BUFFER_DURATION: float = 0.15
+const COYOTE_DURATION: float = 0.08
+var jump_buffer_timer: float = 0.0
+var coyote_timer: float = 0.0
+
+
 
 func setup_from_data(data: CharacterData) -> void:
 	character_name = data.id
@@ -62,6 +70,8 @@ func setup_from_data(data: CharacterData) -> void:
 		var kaal_frames = preload("res://kaal_frames.tres")
 		var nex_frames = preload("res://nex_frames.tres")
 		animated_sprite.sprite_frames = kaal_frames if data.id == "KAAL" else nex_frames
+		animated_sprite.scale = SPRITE_SCALE
+		animated_sprite.position = Vector2(0, -6)
 		animated_sprite.play("idle")
 	health_changed.emit(self, health, max_health)
 	ki_changed.emit(self, ki, MAX_KI)
@@ -70,10 +80,13 @@ func setup_from_data(data: CharacterData) -> void:
 func _ready() -> void:
 	health = max_health
 	ki = 0.0
+	floor_snap_length = 8.0
 	original_color = body_visual.color
 	add_to_group("fighters")
 	
 	if animated_sprite:
+		animated_sprite.scale = SPRITE_SCALE
+		animated_sprite.position = Vector2(0, -6)
 		animated_sprite.play("idle")
 	else:
 		print("AnimatedSprite2D not found for ", name)
@@ -85,6 +98,7 @@ func _ready() -> void:
 	ki_changed.emit(self, ki, MAX_KI)
 	body_visual.pivot_offset = body_visual.size / 2.0
 	original_visual_scale = body_visual.scale
+
 
 
 func add_ki(amount: float) -> void:
@@ -113,12 +127,25 @@ func _unhandled_input(event: InputEvent) -> void:
 			_key_special_pressed = true
 		elif event.physical_keycode == KEY_E or event.keycode == KEY_E:
 			_key_ultimate_pressed = true
+		elif event.physical_keycode == KEY_W or event.keycode == KEY_W:
+			jump_buffer_timer = JUMP_BUFFER_DURATION
 	else:
-		# Player 2: Right Shift for Special, Enter for Ultimate
+		# Player 2: Support Arrows, IJKL, Numpad, Right Shift, Enter
 		if (event.physical_keycode == KEY_SHIFT or event.keycode == KEY_SHIFT) and event.location == KEY_LOCATION_RIGHT:
+			_key_special_pressed = true
+		elif event.physical_keycode == KEY_Y or event.keycode == KEY_Y or event.physical_keycode == KEY_KP_7:
 			_key_special_pressed = true
 		elif event.physical_keycode == KEY_ENTER or event.keycode == KEY_ENTER or event.physical_keycode == KEY_KP_ENTER:
 			_key_ultimate_pressed = true
+		elif event.physical_keycode == KEY_P or event.keycode == KEY_P or event.physical_keycode == KEY_KP_9:
+			_key_ultimate_pressed = true
+		elif (
+			event.physical_keycode == KEY_UP or event.keycode == KEY_UP
+			or event.physical_keycode == KEY_I or event.keycode == KEY_I
+			or event.physical_keycode == KEY_KP_8
+		):
+			jump_buffer_timer = JUMP_BUFFER_DURATION
+
 
 
 func _physics_process(delta: float) -> void:
@@ -182,6 +209,14 @@ func _physics_process(delta: float) -> void:
 		and stun_time == 0.0
 	)
 
+	# Coyote time & jump buffer management
+	if is_on_floor():
+		coyote_timer = COYOTE_DURATION
+	else:
+		coyote_timer = maxf(0.0, coyote_timer - delta)
+
+	jump_buffer_timer = maxf(0.0, jump_buffer_timer - delta)
+
 	if stun_time > 0.0:
 		velocity.x = move_toward(velocity.x, 0.0, 1000.0 * delta)
 		# Clear attack buffers while stunned
@@ -206,8 +241,14 @@ func _physics_process(delta: float) -> void:
 		update_facing_visual()
 		velocity.x = direction * move_speed
 
-		if Input.is_action_just_pressed(jump_action) and is_on_floor():
+		# Check both action event and buffered jump
+		if Input.is_action_just_pressed(jump_action):
+			jump_buffer_timer = JUMP_BUFFER_DURATION
+
+		if jump_buffer_timer > 0.0 and (is_on_floor() or coyote_timer > 0.0):
 			velocity.y = jump_velocity
+			jump_buffer_timer = 0.0
+			coyote_timer = 0.0
 
 		if not blocking:
 			var want_ultimate: bool = Input.is_action_just_pressed(ultimate_action) or _key_ultimate_pressed
@@ -227,8 +268,13 @@ func _physics_process(delta: float) -> void:
 
 	if not is_on_floor():
 		velocity.y += GRAVITY * delta
+	else:
+		# Ensure grounded contact remains solid during horizontal motion
+		if velocity.y > 0.0:
+			velocity.y = 10.0
 
 	move_and_slide()
+
 	
 	update_animation()
 	

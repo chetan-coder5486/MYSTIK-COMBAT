@@ -223,29 +223,29 @@ func cancel_attack() -> void:
 
 
 func get_attack_hitbox() -> Rect2:
-	var reach: float = 65.0
-	var hit_height: float = 38.0
+	var reach: float = 55.0
+	var hit_height: float = 42.0
 	
 	match attack_kind:
 		"heavy":
-			reach = 85.0
-			hit_height = 55.0
+			reach = 72.0
+			hit_height = 54.0
 		"special":
-			reach = 95.0
+			reach = 76.0
 			hit_height = 62.0
 		"ultimate":
-			reach = 120.0
-			hit_height = 80.0
+			reach = 90.0
+			hit_height = 76.0
 		_: # light
-			reach = 65.0
-			hit_height = 38.0
+			reach = 55.0
+			hit_height = 42.0
 
-	var hit_y: float = fighter.global_position.y - 100.0 * 0.55
+	var hit_y: float = fighter.global_position.y - 20.0 - hit_height * 0.5
 	var hit_x: float
 	if fighter.facing > 0.0:
-		hit_x = fighter.global_position.x + fighter.BODY_WIDTH / 2.0
+		hit_x = fighter.global_position.x + fighter.BODY_WIDTH * 0.5
 	else:
-		hit_x = fighter.global_position.x - fighter.BODY_WIDTH / 2.0 - reach
+		hit_x = fighter.global_position.x - fighter.BODY_WIDTH * 0.5 - reach
 
 	return Rect2(hit_x, hit_y, reach, hit_height)
 

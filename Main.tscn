@@ -9,10 +9,10 @@
 [ext_resource type="SpriteFrames" uid="uid://btqo1yddnt6fy" path="res://nex_frames.tres" id="7_trn2v"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_ov7s5"]
-size = Vector2(40, 100)
+size = Vector2(60, 160)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_5eqb6"]
-size = Vector2(40, 100)
+size = Vector2(60, 160)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_f7pic"]
 size = Vector2(1152, 40)
@@ -21,15 +21,15 @@ size = Vector2(1152, 40)
 script = ExtResource("1_uu6xs")
 
 [node name="Fighter1" type="CharacterBody2D" parent="." unique_id=1155618113]
-position = Vector2(250, 500)
+position = Vector2(250, 470)
 script = ExtResource("1_glv2v")
 
 [node name="ColorRect" type="ColorRect" parent="Fighter1" unique_id=929096672]
 visible = false
-offset_left = -20.0
-offset_top = -50.0
-offset_right = 20.0
-offset_bottom = 50.0
+offset_left = -30.0
+offset_top = -80.0
+offset_right = 30.0
+offset_bottom = 80.0
 color = Color(0, 0, 1, 1)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Fighter1" unique_id=1125797371]
@@ -46,22 +46,22 @@ script = ExtResource("5_fos0i")
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="Fighter1" unique_id=83572601]
 z_index = 1
-position = Vector2(2, 2)
-scale = Vector2(0.15, 0.15)
+position = Vector2(0, -6)
+scale = Vector2(0.26, 0.26)
 sprite_frames = ExtResource("6_lgr22")
 animation = &"idle"
 
 [node name="Fighter2" type="CharacterBody2D" parent="." unique_id=1225470398]
-position = Vector2(900, 500)
+position = Vector2(900, 470)
 script = ExtResource("1_glv2v")
 player_number = 2
 
 [node name="ColorRect" type="ColorRect" parent="Fighter2" unique_id=2073728184]
 visible = false
-offset_left = -20.0
-offset_top = -50.0
-offset_right = 20.0
-offset_bottom = 50.0
+offset_left = -30.0
+offset_top = -80.0
+offset_right = 30.0
+offset_bottom = 80.0
 color = Color(1, 0, 0, 1)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Fighter2" unique_id=1740373817]
@@ -77,7 +77,8 @@ script = ExtResource("4_cm0pq")
 script = ExtResource("5_fos0i")
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="Fighter2" unique_id=1283876797]
-scale = Vector2(0.15, 0.15)
+position = Vector2(0, -6)
+scale = Vector2(0.26, 0.26)
 sprite_frames = ExtResource("7_trn2v")
 animation = &"idle"
 

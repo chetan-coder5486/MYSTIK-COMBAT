@@ -40,7 +40,8 @@ const DIRECTIONS: Dictionary = {
 @export_group("Presentation")
 @export var background: Texture2D
 @export var title: String = "SELECT YOUR FIGHTER"
-@export_multiline var hint_text: String = "P1   WASD MOVE  -  F SELECT  -  G BACK          P2   ARROWS MOVE  -  ENTER SELECT  -  BACKSPACE BACK"
+@export_multiline var hint_text: String = "P1: WASD MOVE  -  F SELECT  -  G BACK          P2: ARROWS / IJKL / NUMPAD MOVE  -  ENTER SELECT  -  BACKSPACE BACK"
+
 
 @export_group("Audio")
 @export var sfx_move: AudioStream
@@ -251,13 +252,14 @@ func _default_bindings(slot: int) -> Dictionary:
 			"cancel": [_key(KEY_G), _pad_button(JOY_BUTTON_B, 0)],
 		}
 	return {
-		"left": [_key(KEY_LEFT), _pad_button(JOY_BUTTON_DPAD_LEFT, 1), _pad_axis(JOY_AXIS_LEFT_X, -1.0, 1)],
-		"right": [_key(KEY_RIGHT), _pad_button(JOY_BUTTON_DPAD_RIGHT, 1), _pad_axis(JOY_AXIS_LEFT_X, 1.0, 1)],
-		"up": [_key(KEY_UP), _pad_button(JOY_BUTTON_DPAD_UP, 1), _pad_axis(JOY_AXIS_LEFT_Y, -1.0, 1)],
-		"down": [_key(KEY_DOWN), _pad_button(JOY_BUTTON_DPAD_DOWN, 1), _pad_axis(JOY_AXIS_LEFT_Y, 1.0, 1)],
+		"left": [_key(KEY_LEFT), _key(KEY_J), _key(KEY_KP_4), _pad_button(JOY_BUTTON_DPAD_LEFT, 1), _pad_axis(JOY_AXIS_LEFT_X, -1.0, 1)],
+		"right": [_key(KEY_RIGHT), _key(KEY_L), _key(KEY_KP_6), _pad_button(JOY_BUTTON_DPAD_RIGHT, 1), _pad_axis(JOY_AXIS_LEFT_X, 1.0, 1)],
+		"up": [_key(KEY_UP), _key(KEY_I), _key(KEY_KP_8), _pad_button(JOY_BUTTON_DPAD_UP, 1), _pad_axis(JOY_AXIS_LEFT_Y, -1.0, 1)],
+		"down": [_key(KEY_DOWN), _key(KEY_K), _key(KEY_KP_5), _key(KEY_KP_2), _pad_button(JOY_BUTTON_DPAD_DOWN, 1), _pad_axis(JOY_AXIS_LEFT_Y, 1.0, 1)],
 		"confirm": [_key(KEY_ENTER), _key(KEY_KP_ENTER), _pad_button(JOY_BUTTON_A, 1)],
 		"cancel": [_key(KEY_BACKSPACE), _pad_button(JOY_BUTTON_B, 1)],
 	}
+
 
 
 func _key(code: Key) -> InputEventKey:

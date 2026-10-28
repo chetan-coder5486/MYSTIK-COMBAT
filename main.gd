@@ -280,11 +280,21 @@ func _ready() -> void:
 	status_label.add_theme_font_size_override("font_size", 28)
 	hud.add_child(status_label)
 
+	var controls_hint := Label.new()
+	controls_hint.position = Vector2(0, 624)
+	controls_hint.size = Vector2(1152, 22)
+	controls_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	controls_hint.add_theme_font_size_override("font_size", 12)
+	controls_hint.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.45))
+	controls_hint.text = "P1: WASD Move/Jump • F Light • G Heavy • Q Special • E Ult   |   P2: Arrows / IJKL / Numpad • / Light • . Heavy • Shift Special • Enter Ult"
+	hud.add_child(controls_hint)
+
 	# Cinematic Ultimate Overlay
 	_setup_ultimate_overlay(hud)
 
 	# Start the first round
 	prepare_round()
+
 
 
 
@@ -591,8 +601,8 @@ func prepare_round() -> void:
 		fighter.combat_component.cancel_attack()
 		fighter.combo_component.reset()
 
-	fighter1.global_position = Vector2(250, 500)
-	fighter2.global_position = Vector2(900, 500)
+	fighter1.global_position = Vector2(250, 470)
+	fighter2.global_position = Vector2(900, 470)
 
 	fighter1.facing = 1.0
 	fighter2.facing = -1.0
