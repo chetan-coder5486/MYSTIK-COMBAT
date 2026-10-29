@@ -31,35 +31,6 @@ texture = ExtResource("6_bg")
 expand_mode = 1
 stretch_mode = 6
 
-[node name="BackButton" type="Button" parent="." unique_id=1639560526]
-unique_name_in_owner = true
-z_index = 5
-layout_mode = 0
-offset_left = 48.0
-offset_top = 26.0
-offset_right = 176.0
-offset_bottom = 70.0
-focus_mode = 0
-theme_override_font_sizes/font_size = 20
-text = "< BACK"
-
-[node name="TitleLabel" type="Label" parent="." unique_id=1359917305]
-unique_name_in_owner = true
-z_index = 5
-layout_mode = 1
-anchors_preset = 5
-anchor_left = 0.5
-anchor_right = 0.5
-offset_left = -400.0
-offset_top = 24.0
-offset_right = 400.0
-offset_bottom = 72.0
-grow_horizontal = 2
-theme_override_font_sizes/font_size = 32
-text = "SELECT YOUR FIGHTER"
-horizontal_alignment = 1
-vertical_alignment = 1
-
 [node name="SafeArea" type="MarginContainer" parent="." unique_id=437056005]
 layout_mode = 1
 anchors_preset = 15
@@ -67,6 +38,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 theme_override_constants/margin_left = 56
 theme_override_constants/margin_top = 88
 theme_override_constants/margin_right = 56
@@ -74,6 +46,7 @@ theme_override_constants/margin_bottom = 44
 
 [node name="Layout" type="VBoxContainer" parent="SafeArea" unique_id=1929469976]
 layout_mode = 2
+mouse_filter = 2
 theme_override_constants/separation = 12
 
 [node name="Stage" type="HBoxContainer" parent="SafeArea/Layout" unique_id=600817127]
@@ -107,6 +80,7 @@ flip_portrait = true
 [node name="HintLabel" type="Label" parent="SafeArea/Layout" unique_id=2001279327]
 unique_name_in_owner = true
 layout_mode = 2
+mouse_filter = 2
 theme_override_colors/font_color = Color(0.75, 0.78, 0.88, 0.8)
 theme_override_font_sizes/font_size = 18
 horizontal_alignment = 1
@@ -146,6 +120,34 @@ layout_mode = 2
 theme_override_constants/h_separation = 16
 theme_override_constants/v_separation = 16
 columns = 4
+
+[node name="BackButton" type="Button" parent="." unique_id=1639560526]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 48.0
+offset_top = 26.0
+offset_right = 176.0
+offset_bottom = 70.0
+mouse_filter = 0
+theme_override_font_sizes/font_size = 20
+text = "< BACK"
+
+[node name="TitleLabel" type="Label" parent="." unique_id=1359917305]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -400.0
+offset_top = 24.0
+offset_right = 400.0
+offset_bottom = 72.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 32
+text = "SELECT YOUR FIGHTER"
+horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="Fade" type="ColorRect" parent="." unique_id=2075002317]
 unique_name_in_owner = true
