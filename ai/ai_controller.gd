@@ -110,19 +110,38 @@ func _make_decision() -> void:
 		var incoming: String = opponent.combat_component.attack_kind
 		var opp_cc = opponent.combat_component
 		var in_startup: bool = opp_cc.attack_time < opp_cc.get_startup_time(incoming)
+		var is_projectile: bool = (incoming == "special" or incoming == "ultimate")
+		var is_melee_in_range: bool = false
 
-		# If opponent is in startup of a slow move (heavy or ultimate) and we are close, jab to interrupt!
-		if in_startup and (incoming == "heavy" or incoming == "ultimate") and dist <= 75.0:
-			if randf() < difficulty:
-				current_state = State.COUNTER
-				current_strategy = "INTERRUPTING WITH JAB"
+		if incoming == "light":
+			is_melee_in_range = dist <= 115.0
+		elif incoming == "heavy":
+			is_melee_in_range = dist <= 135.0
+
+		if is_projectile or is_melee_in_range:
+			# If opponent is in startup of a slow move (heavy or ultimate) and we are close, jab to interrupt!
+			if in_startup and (incoming == "heavy" or incoming == "ultimate") and dist <= 75.0:
+				if randf() < difficulty:
+					current_state = State.COUNTER
+					current_strategy = "INTERRUPTING WITH JAB"
+					return
+
+			# Otherwise block legitimate incoming threat
+			if randf() < (0.65 + difficulty * 0.3):
+				current_state = State.BLOCK
+				current_strategy = "GUARDING INCOMING %s" % incoming.to_upper()
 				return
-
-		# Otherwise block
-		if randf() < (0.65 + difficulty * 0.3):
-			current_state = State.BLOCK
-			current_strategy = "GUARDING INCOMING %s" % incoming.to_upper()
-			return
+		else:
+			# Opponent is whiffing a melee strike outside threat range!
+			# Take advantage of opponent's attack recovery to close distance or punish!
+			if fighter.ki >= 40.0 and dist > 180.0 and randf() < 0.6:
+				current_state = State.ATTACK
+				current_strategy = "PUNISHING WHIFF (ENERGY WAVE)"
+				return
+			else:
+				current_state = State.APPROACH
+				current_strategy = "CLOSING DISTANCE (WHIFF PUNISH)"
+				return
 
 	# Priority 3: Counter predictable patterns
 	if summary.total_attacks >= 3 and summary.predictability >= 0.45:
@@ -239,24 +258,37 @@ func _select_attack_by_distance(dist: float) -> void:
 			move_axis = signf(opponent.global_position.x - fighter.global_position.x)
 
 func _execute_counter_habit(dist: float) -> void:
+	var toward_opponent: float = signf(opponent.global_position.x - fighter.global_position.x)
 	match predicted_move:
 		"light":
-			# Player spams light: block first hit to get frame advantage, or spacing heavy attack
+			# Player spams light:
 			if dist <= 65.0:
+				# Close range: block first hit to get frame advantage
 				want_block = true
-			else:
+			elif dist <= 125.0:
+				# In reach: out-range and crush with heavy attack
 				want_heavy = true
-		"heavy":
-			# Player spams slow heavy: interrupt with fast light attack before startup finishes
-			if dist <= 75.0:
-				want_light = true
 			else:
+				# Beyond melee reach: close distance or counter-zone
+				if fighter.ki >= 40.0 and randf() < 0.5:
+					want_special = true
+				else:
+					move_axis = toward_opponent
+					if dist > 200.0 and randf() < 0.05 and fighter.is_on_floor():
+						want_jump = true
+		"heavy":
+			# Player spams slow heavy:
+			if dist <= 75.0:
+				want_light = true # interrupt startup with fast jab
+			elif dist <= 135.0:
 				want_block = true
+			else:
+				move_axis = toward_opponent
 		"special":
 			# Player likes projectiles: jump over or block
 			if dist > 120.0 and fighter.is_on_floor() and randf() < 0.6:
 				want_jump = true
-				move_axis = signf(opponent.global_position.x - fighter.global_position.x)
+				move_axis = toward_opponent
 			else:
 				want_block = true
 		"ultimate":

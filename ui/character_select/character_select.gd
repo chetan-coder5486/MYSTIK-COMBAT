@@ -96,8 +96,39 @@ func _ready() -> void:
 	if background:
 		_background.texture = background
 	_title_label.text = title
+	_title_label.add_theme_color_override("font_color", Color.WHITE)
+	_title_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.85))
+	_title_label.add_theme_constant_override("shadow_offset_y", 3)
+	_title_label.add_theme_constant_override("shadow_outline_size", 6)
+
 	_hint_label.text = hint_text
 	_back_button.pressed.connect(_go_back)
+
+	# Clean stylized back button
+	var btn_normal := StyleBoxFlat.new()
+	btn_normal.bg_color = Color(0.06, 0.08, 0.14, 0.85)
+	btn_normal.border_color = Color(0.25, 0.35, 0.55, 0.7)
+	btn_normal.border_width_left = 2
+	btn_normal.border_width_top = 2
+	btn_normal.border_width_right = 2
+	btn_normal.border_width_bottom = 2
+	btn_normal.set_corner_radius_all(6)
+	_back_button.add_theme_stylebox_override("normal", btn_normal)
+
+	var btn_hover := btn_normal.duplicate()
+	btn_hover.bg_color = Color(0.12, 0.16, 0.26, 0.95)
+	btn_hover.border_color = Color(1.0, 0.85, 0.28, 0.95)
+	_back_button.add_theme_stylebox_override("hover", btn_hover)
+	_back_button.add_theme_stylebox_override("focus", btn_hover)
+
+	var btn_pressed := btn_normal.duplicate()
+	btn_pressed.bg_color = Color(0.04, 0.05, 0.09, 1.0)
+	btn_pressed.border_color = Color(1.0, 0.85, 0.28, 1.0)
+	_back_button.add_theme_stylebox_override("pressed", btn_pressed)
+
+	_back_button.add_theme_color_override("font_color", Color(0.85, 0.88, 0.95))
+	_back_button.add_theme_color_override("font_hover_color", Color(1.0, 0.86, 0.28))
+	_back_button.add_theme_color_override("font_focus_color", Color(1.0, 0.86, 0.28))
 
 	_build_roster()
 	_refresh()

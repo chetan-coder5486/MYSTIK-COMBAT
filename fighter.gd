@@ -53,6 +53,7 @@ var boss_title: String = ""
 var damage_multiplier: float = 1.0
 var damage_taken_multiplier: float = 1.0
 var boss_aura_time: float = 0.0
+var show_hitboxes: bool = false
 
 # Key buffer flags for responsive direct input
 var _key_special_pressed: bool = false
@@ -469,32 +470,33 @@ func _draw() -> void:
 			draw_circle(wisp_pos, 4.0 + pulse * 3.0, aura_col)
 			draw_circle(wisp_pos, 2.0, core_col)
 
-	# Debug hurtbox
-	draw_rect(
-		Rect2(
-			-BODY_WIDTH / 2.0,
-			-BODY_HEIGHT / 2.0,
-			BODY_WIDTH,
-			BODY_HEIGHT
-		),
-		Color(0.1, 0.9, 0.2, 0.25),
-		false,
-		2.0
-	)
+	# Debug hurtbox and attack hitboxes (Hidden by default; toggleable with F3)
+	if show_hitboxes:
+		draw_rect(
+			Rect2(
+				-BODY_WIDTH / 2.0,
+				-BODY_HEIGHT / 2.0,
+				BODY_WIDTH,
+				BODY_HEIGHT
+			),
+			Color(0.1, 0.9, 0.2, 0.25),
+			false,
+			2.0
+		)
 
-	# Draw attack hitbox only during active frames
-	if combat_component.is_attack_active():
-		var hitbox: Rect2 = combat_component.get_attack_hitbox()
-		hitbox.position -= global_position
+		# Draw attack hitbox only during active frames
+		if combat_component.is_attack_active():
+			var hitbox: Rect2 = combat_component.get_attack_hitbox()
+			hitbox.position -= global_position
 
-		var box_col: Color = Color(1.0, 0.1, 0.1, 0.45)
-		if combat_component.attack_kind == "special":
-			box_col = Color(1.0, 0.6, 0.1, 0.45)
-		elif combat_component.attack_kind == "ultimate":
-			box_col = Color(1.0, 0.9, 0.1, 0.55)
+			var box_col: Color = Color(1.0, 0.1, 0.1, 0.45)
+			if combat_component.attack_kind == "special":
+				box_col = Color(1.0, 0.6, 0.1, 0.45)
+			elif combat_component.attack_kind == "ultimate":
+				box_col = Color(1.0, 0.9, 0.1, 0.55)
 
-		draw_rect(hitbox, box_col, true)
-		draw_rect(hitbox, Color.RED if combat_component.attack_kind != "ultimate" else Color.GOLD, false, 2.0)
+			draw_rect(hitbox, box_col, true)
+			draw_rect(hitbox, Color.RED if combat_component.attack_kind != "ultimate" else Color.GOLD, false, 2.0)
 
 
 func update_animation() -> void:

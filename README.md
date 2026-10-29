@@ -19,6 +19,7 @@
 7. [Controls & Keybindings](#-controls--keybindings)
 8. [Project Structure](#-project-structure)
 9. [Getting Started](#-getting-started)
+10. [Building & Exporting (.exe)](#-building--exporting-standalone-windows-executable-exe)
 
 ---
 
@@ -209,14 +210,15 @@ graph TD
 | **Special Attack (40 Ki)** | `Right Shift` or Numpad `7` | Gamepad 2 Button West |
 | **Ultimate (100 Ki)** | `Enter` or Numpad `9` | Gamepad 2 Button North |
 
-### Debug & Inspector Hotkeys
+### Debug & System Hotkeys
 | Key | Function |
 | :--- | :--- |
+| `ESC` / Gamepad `Start` | **Pause / Resume Match** (Opens Pause Menu with Resume, Restart, Controls & Quit) |
 | `F1` | Toggle **Frame Data Inspector** (Live startup, active, recovery, advantage) |
 | `F2` | Toggle **Adaptive AI Brain Overlay** (Markov state, habit meter, confidence) |
+| `F3` | Toggle **Debug Hitboxes & Arena Boundaries** (Visual collision debugging) |
 | `F5` | **Hot-Reload Grimoire Data** (Re-reads JSON without restarting) |
 | `TAB` | Toggle **P2 Mode (CPU / Human)** on Character Select |
-| `ESC` | Pause / Back to Menu |
 
 ---
 
@@ -276,3 +278,28 @@ MYSTIK-COMBAT/
    - **`ARCADE`** to challenge The Gauntlet against progressive AI and the Final Boss.
    - **`VERSUS (2-PLAYER)`** to play locally with a friend on keyboard or gamepads.
    - **`VS CPU`** to spar against the Adaptive Intelligence AI.
+
+---
+
+## 📦 Building & Exporting Standalone Windows Executable (`.exe`)
+
+To package MYSTIK-COMBAT into a standalone `.exe` you can share or play without opening Godot:
+
+### Step 1: Install Godot Export Templates
+1. In the Godot top menu bar, go to **Editor** → **Manage Export Templates...**.
+2. Click **Download and Install** (Godot will download the official templates matching your Godot 4.7 version).
+3. Once downloaded, close the dialog.
+
+### Step 2: Configure the Windows Export Preset
+1. In the top menu bar, click **Project** → **Export...**.
+2. Click **Add...** at the top and select **Windows Desktop**.
+3. In the right options pane:
+   - *(Optional)* Under **Binary Format**, enable **Embed PCK** if you want a single self-contained `.exe` file with all assets bundled inside.
+   - Under **Application**, set your desired Name, File Version, and Icon if needed.
+
+### Step 3: Export the Executable
+1. Click the **Export Project...** button at the bottom of the Export dialog.
+2. Choose your destination directory (e.g. create a `build/` folder inside the project).
+3. Name your file (e.g. `MystikCombat.exe`).
+4. Ensure **Export With Debug** is unchecked for release builds, then click **Save**.
+5. Your standalone game is ready in that folder! Double-click `MystikCombat.exe` to run.

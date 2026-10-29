@@ -32,8 +32,16 @@ var ultimate_banner_label: Label
 var ultimate_sub_label: Label
 var is_cinematic_active: bool = false
 
+# Frame data & AI Brain overlays
 var frame_data_inspector: FrameDataInspector
 var ai_debug_overlay: AIDebugOverlay
+
+# Pause & Menu System
+var pause_layer: CanvasLayer = null
+var pause_modal: Control = null
+var pause_controls_modal: Control = null
+var pause_subtitle: Label = null
+var pause_buttons: Array[Button] = []
 
 var round_number: int = 1
 var round_wins: Array[int] = [0, 0]
@@ -138,17 +146,21 @@ func _setup_arena() -> void:
 		cyan_strip.color = Color(0.25, 0.95, 1.0, 0.75)
 		floor_node.add_child(cyan_strip)
 
-	# Arena Boundary Markers (Pillars of Power at arena borders)
+	# Arena Boundary Markers (Pillars of Power at arena borders - hidden by default, toggled with F3)
 	var left_pillar := ColorRect.new()
+	left_pillar.name = "LeftPillar"
 	left_pillar.position = Vector2(12, 180)
 	left_pillar.size = Vector2(6, 390)
 	left_pillar.color = Color(0.9, 0.25, 0.35, 0.4)
+	left_pillar.visible = false
 	arena_root.add_child(left_pillar)
 
 	var right_pillar := ColorRect.new()
+	right_pillar.name = "RightPillar"
 	right_pillar.position = Vector2(1134, 180)
 	right_pillar.size = Vector2(6, 390)
 	right_pillar.color = Color(0.25, 0.75, 1.0, 0.4)
+	right_pillar.visible = false
 	arena_root.add_child(right_pillar)
 
 	# Ambient Particles: Floor Embers & Dimensional Motes
@@ -190,8 +202,11 @@ func _setup_arena() -> void:
 
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_PAUSABLE
 	fighter1 = get_node("Fighter1")
 	fighter2 = get_node("Fighter2")
+	fighter1.process_mode = Node.PROCESS_MODE_PAUSABLE
+	fighter2.process_mode = Node.PROCESS_MODE_PAUSABLE
 
 	apply_character_selection()
 	_setup_arena()
@@ -351,7 +366,7 @@ func _ready() -> void:
 	controls_hint.add_theme_font_size_override("font_size", 12)
 	controls_hint.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.6))
 	var p2_ctrl_hint: String = "AI (Adaptive)" if (fighter2 and fighter2.is_ai) else "Arrows/IJKL • / Light • . Heavy"
-	controls_hint.text = "P1: WASD Move • F Light • G Heavy • Q Spcl • E Ult  |  P2: %s  |  [F1] Frame Inspector  [F2] AI Brain  [F5] Hot-Reload" % p2_ctrl_hint
+	controls_hint.text = "P1: WASD Move • F Light • G Heavy • Q Spcl • E Ult  |  P2: %s  |  [F1] Frames  [F2] AI Brain  [F3] Hitboxes  [F5] Reload" % p2_ctrl_hint
 	hud.add_child(controls_hint)
 
 	# Frame Data Inspector & Adaptive AI Overlay
@@ -368,6 +383,9 @@ func _ready() -> void:
 
 	# Cinematic Ultimate Overlay
 	_setup_ultimate_overlay(hud)
+
+	# In-Match Pause & Controls Modal
+	_build_pause_modal()
 
 	# Start the first round
 	prepare_round()
@@ -501,6 +519,9 @@ func trigger_ultimate_cinematic(attacker: CharacterBody2D) -> void:
 
 
 func _process(delta: float) -> void:
+	if get_tree().paused:
+		return
+
 	# Screen shake update
 	if shake_intensity > 0.0:
 		shake_intensity = maxf(0.0, shake_intensity - delta * 30.0)
@@ -764,6 +785,13 @@ func start_next_round() -> void:
 
 
 func restart_match() -> void:
+	if get_tree().paused:
+		get_tree().paused = false
+	if pause_modal != null:
+		pause_modal.visible = false
+	if pause_controls_modal != null:
+		pause_controls_modal.visible = false
+
 	round_wins = [0, 0]
 	round_number = 1
 	match_over = false
@@ -771,10 +799,390 @@ func restart_match() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not (event is InputEventKey):
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_F3:
+			var show_debug: bool = not fighter1.show_hitboxes
+			fighter1.show_hitboxes = show_debug
+			fighter2.show_hitboxes = show_debug
+			fighter1.queue_redraw()
+			fighter2.queue_redraw()
+
+			var lp = get_node_or_null("AtmosphericArena/LeftPillar")
+			if lp: lp.visible = show_debug
+			var rp = get_node_or_null("AtmosphericArena/RightPillar")
+			if rp: rp.visible = show_debug
+			get_viewport().set_input_as_handled()
+			return
+
+		if event.keycode == KEY_ESCAPE:
+			if pause_controls_modal != null and pause_controls_modal.visible:
+				_toggle_pause_controls(false)
+			else:
+				_toggle_pause()
+			get_viewport().set_input_as_handled()
+			return
+
+		if event.keycode == KEY_R and match_over:
+			restart_match()
+			get_viewport().set_input_as_handled()
+			return
+
+	elif event is InputEventJoypadButton and event.pressed:
+		if event.button_index == JOY_BUTTON_START or event.button_index == JOY_BUTTON_BACK:
+			if pause_controls_modal != null and pause_controls_modal.visible:
+				_toggle_pause_controls(false)
+			else:
+				_toggle_pause()
+			get_viewport().set_input_as_handled()
+			return
+
+
+# --- In-Match Pause & Controls System ----------------------------------------
+
+func _build_pause_modal() -> void:
+	pause_layer = CanvasLayer.new()
+	pause_layer.layer = 30
+	pause_layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(pause_layer)
+
+	var PauseMenuScript = preload("res://ui/pause_menu.gd")
+	var p_menu: PauseMenu = PauseMenuScript.new()
+	p_menu.name = "PauseModal"
+	p_menu.custom_minimum_size = Vector2(1152, 648)
+	p_menu.size = Vector2(1152, 648)
+	p_menu.visible = false
+	pause_modal = p_menu
+	pause_layer.add_child(pause_modal)
+
+	p_menu.resume_requested.connect(func(): _toggle_pause(false))
+	p_menu.restart_requested.connect(_on_restart_from_pause)
+	p_menu.quit_requested.connect(_on_quit_to_main_menu)
+
+	# 1. Dark Translucent Backdrop
+	var backdrop := ColorRect.new()
+	backdrop.size = Vector2(1152, 648)
+	backdrop.color = Color(0.02, 0.03, 0.06, 0.82)
+	pause_modal.add_child(backdrop)
+
+	# 2. Centered Dialog Card
+	var dialog := PanelContainer.new()
+	dialog.custom_minimum_size = Vector2(440, 420)
+	dialog.size = Vector2(440, 420)
+	dialog.position = Vector2(356, 114)
+
+	var d_style := StyleBoxFlat.new()
+	d_style.bg_color = Color(0.08, 0.09, 0.14, 0.98)
+	d_style.border_width_left = 2
+	d_style.border_width_top = 2
+	d_style.border_width_right = 2
+	d_style.border_width_bottom = 2
+	d_style.border_color = Color(0.3, 0.75, 1.0, 0.85)
+	d_style.set_corner_radius_all(10)
+	d_style.shadow_color = Color(0.1, 0.5, 0.9, 0.25)
+	d_style.shadow_size = 20
+	dialog.add_theme_stylebox_override("panel", d_style)
+	pause_modal.add_child(dialog)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 32)
+	margin.add_theme_constant_override("margin_top", 24)
+	margin.add_theme_constant_override("margin_right", 32)
+	margin.add_theme_constant_override("margin_bottom", 24)
+	dialog.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 14)
+	margin.add_child(vbox)
+
+	# Header Title
+	var title_lbl := Label.new()
+	title_lbl.text = "PAUSED"
+	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_lbl.add_theme_font_size_override("font_size", 34)
+	title_lbl.add_theme_color_override("font_color", Color.WHITE)
+	title_lbl.add_theme_color_override("font_shadow_color", Color(0.3, 0.7, 1.0, 0.6))
+	title_lbl.add_theme_constant_override("shadow_offset_y", 3)
+	title_lbl.add_theme_constant_override("shadow_outline_size", 6)
+	vbox.add_child(title_lbl)
+
+	pause_subtitle = Label.new()
+	pause_subtitle.text = "MATCH IN PROGRESS"
+	pause_subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pause_subtitle.add_theme_font_size_override("font_size", 13)
+	pause_subtitle.add_theme_color_override("font_color", Color(0.7, 0.82, 0.95, 0.8))
+	vbox.add_child(pause_subtitle)
+
+	var div := ColorRect.new()
+	div.custom_minimum_size = Vector2(0, 2)
+	div.color = Color(0.3, 0.75, 1.0, 0.4)
+	vbox.add_child(div)
+
+	var btn_vbox := VBoxContainer.new()
+	btn_vbox.add_theme_constant_override("separation", 10)
+	vbox.add_child(btn_vbox)
+
+	# Action Buttons
+	var resume_btn := _create_pause_button("RESUME")
+	resume_btn.pressed.connect(func(): _toggle_pause(false))
+	btn_vbox.add_child(resume_btn)
+	pause_buttons.append(resume_btn)
+
+	var restart_btn := _create_pause_button("RESTART MATCH")
+	restart_btn.pressed.connect(_on_restart_from_pause)
+	btn_vbox.add_child(restart_btn)
+	pause_buttons.append(restart_btn)
+
+	var controls_btn := _create_pause_button("HOW TO PLAY / CONTROLS")
+	controls_btn.pressed.connect(func(): _toggle_pause_controls(true))
+	btn_vbox.add_child(controls_btn)
+	pause_buttons.append(controls_btn)
+
+	var quit_btn := _create_pause_button("QUIT TO MAIN MENU")
+	quit_btn.pressed.connect(_on_quit_to_main_menu)
+	btn_vbox.add_child(quit_btn)
+	pause_buttons.append(quit_btn)
+
+	var sp := Control.new()
+	sp.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(sp)
+
+	var footer := Label.new()
+	footer.text = "[W / S / ↑ / ↓] Navigate  •  [ENTER / SPACE] Select  •  [ESC] Resume"
+	footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	footer.add_theme_font_size_override("font_size", 11)
+	footer.add_theme_color_override("font_color", Color(0.65, 0.72, 0.85, 0.6))
+	vbox.add_child(footer)
+
+	_build_pause_controls_modal()
+	p_menu.controls_modal = pause_controls_modal
+	p_menu.buttons = pause_buttons
+
+
+func _create_pause_button(label_text: String) -> Button:
+	var btn := Button.new()
+	btn.text = label_text
+	btn.custom_minimum_size = Vector2(360, 42)
+	btn.add_theme_font_size_override("font_size", 15)
+
+	var box := StyleBoxFlat.new()
+	box.bg_color = Color(0.11, 0.13, 0.19, 0.90)
+	box.border_width_left = 2
+	box.border_width_top = 2
+	box.border_width_right = 2
+	box.border_width_bottom = 2
+	box.border_color = Color(0.28, 0.38, 0.58, 0.7)
+	box.set_corner_radius_all(6)
+	btn.add_theme_stylebox_override("normal", box)
+
+	var h_box := box.duplicate()
+	h_box.bg_color = Color(0.18, 0.22, 0.33, 0.98)
+	h_box.border_color = Color(1.0, 0.85, 0.28, 0.95)
+	btn.add_theme_stylebox_override("hover", h_box)
+	btn.add_theme_stylebox_override("focus", h_box)
+
+	var p_box := box.duplicate()
+	p_box.bg_color = Color(0.07, 0.08, 0.13, 1.0)
+	p_box.border_color = Color(1.0, 0.85, 0.28, 1.0)
+	btn.add_theme_stylebox_override("pressed", p_box)
+
+	btn.add_theme_color_override("font_color", Color(0.85, 0.88, 0.95))
+	btn.add_theme_color_override("font_hover_color", Color(1.0, 0.86, 0.28))
+	btn.add_theme_color_override("font_focus_color", Color(1.0, 0.86, 0.28))
+
+	return btn
+
+
+func _build_pause_controls_modal() -> void:
+	pause_controls_modal = Control.new()
+	pause_controls_modal.size = Vector2(1152, 648)
+	pause_controls_modal.visible = false
+	pause_controls_modal.z_index = 10
+	pause_layer.add_child(pause_controls_modal)
+
+	var backdrop := ColorRect.new()
+	backdrop.size = Vector2(1152, 648)
+	backdrop.color = Color(0.02, 0.03, 0.06, 0.88)
+	pause_controls_modal.add_child(backdrop)
+
+	var dialog := PanelContainer.new()
+	dialog.custom_minimum_size = Vector2(800, 500)
+	dialog.size = Vector2(800, 500)
+	dialog.position = Vector2(176, 74)
+
+	var d_style := StyleBoxFlat.new()
+	d_style.bg_color = Color(0.08, 0.09, 0.14, 0.98)
+	d_style.border_width_left = 2
+	d_style.border_width_top = 2
+	d_style.border_width_right = 2
+	d_style.border_width_bottom = 2
+	d_style.border_color = Color(0.3, 0.75, 1.0, 0.85)
+	d_style.set_corner_radius_all(12)
+	d_style.shadow_color = Color(0.1, 0.5, 0.9, 0.25)
+	d_style.shadow_size = 18
+	dialog.add_theme_stylebox_override("panel", d_style)
+	pause_controls_modal.add_child(dialog)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 24)
+	margin.add_theme_constant_override("margin_top", 20)
+	margin.add_theme_constant_override("margin_right", 24)
+	margin.add_theme_constant_override("margin_bottom", 20)
+	dialog.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 14)
+	margin.add_child(vbox)
+
+	# Header
+	var header := HBoxContainer.new()
+	var h_title := Label.new()
+	h_title.text = "HOW TO PLAY — CONTROLS GUIDE"
+	h_title.add_theme_font_size_override("font_size", 20)
+	h_title.add_theme_color_override("font_color", Color(1.0, 0.85, 0.35))
+	header.add_child(h_title)
+
+	var sp := Control.new()
+	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(sp)
+
+	var close_btn := Button.new()
+	close_btn.text = "BACK TO PAUSE [ESC]"
+	close_btn.add_theme_font_size_override("font_size", 12)
+	close_btn.pressed.connect(func(): _toggle_pause_controls(false))
+	header.add_child(close_btn)
+	vbox.add_child(header)
+
+	var h_div := ColorRect.new()
+	h_div.custom_minimum_size = Vector2(0, 1)
+	h_div.color = Color(0.3, 0.7, 1.0, 0.3)
+	vbox.add_child(h_div)
+
+	# Columns
+	var cols := HBoxContainer.new()
+	cols.add_theme_constant_override("separation", 24)
+	cols.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(cols)
+
+	var p1_box := _build_player_control_column(
+		"PLAYER 1",
+		Color(1.0, 0.8, 0.25),
+		[
+			{"action": "Movement", "keys": "W (Jump)  •  A (Left)  •  D (Right)"},
+			{"action": "Defense", "keys": "S (Block - 65% Dmg Reduction)"},
+			{"action": "Light Attack", "keys": "F (Fast Combo Opener)"},
+			{"action": "Heavy Attack", "keys": "G (Heavy Knockback)"},
+			{"action": "Mystic Special", "keys": "Q (Requires 40 Ki)"},
+			{"action": "Cinematic Ultimate", "keys": "E (Requires 100 Ki)"},
+			{"action": "Gamepad", "keys": "Left Stick / D-Pad + Face Buttons"},
+		]
+	)
+	p1_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cols.add_child(p1_box)
+
+	var p2_box := _build_player_control_column(
+		"PLAYER 2",
+		Color(0.25, 0.85, 1.0),
+		[
+			{"action": "Movement", "keys": "↑ or Num 8 (Jump)  •  ← / →"},
+			{"action": "Defense", "keys": "↓ or Num 2 (Block)"},
+			{"action": "Light Attack", "keys": "/ or Num 1"},
+			{"action": "Heavy Attack", "keys": ". or Num 3"},
+			{"action": "Mystic Special", "keys": "Right Shift or Num 7 (40 Ki)"},
+			{"action": "Cinematic Ultimate", "keys": "Enter or Num 9 (100 Ki)"},
+			{"action": "Gamepad", "keys": "Full Native Gamepad 2 Support"},
+		]
+	)
+	p2_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cols.add_child(p2_box)
+
+
+func _build_player_control_column(title: String, accent_color: Color, bindings: Array[Dictionary]) -> VBoxContainer:
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 8)
+
+	var heading := Label.new()
+	heading.text = title
+	heading.add_theme_font_size_override("font_size", 14)
+	heading.add_theme_color_override("font_color", accent_color)
+	col.add_child(heading)
+
+	var div := ColorRect.new()
+	div.custom_minimum_size = Vector2(0, 1)
+	div.color = accent_color * Color(1, 1, 1, 0.3)
+	col.add_child(div)
+
+	for item in bindings:
+		var row := VBoxContainer.new()
+		row.add_theme_constant_override("separation", 2)
+
+		var a_lbl := Label.new()
+		a_lbl.text = item["action"].to_upper()
+		a_lbl.add_theme_font_size_override("font_size", 10)
+		a_lbl.add_theme_color_override("font_color", accent_color * Color(1, 1, 1, 0.85))
+		row.add_child(a_lbl)
+
+		var k_lbl := Label.new()
+		k_lbl.text = item["keys"]
+		k_lbl.add_theme_font_size_override("font_size", 11)
+		k_lbl.add_theme_color_override("font_color", Color(0.9, 0.9, 0.95))
+		row.add_child(k_lbl)
+		col.add_child(row)
+
+	return col
+
+
+func _toggle_pause(forced_state: Variant = null) -> void:
+	if pause_modal == null:
 		return
-	if not event.pressed or event.echo or event.keycode != KEY_R:
+	if match_over and forced_state == null:
 		return
 
-	if match_over:
-		restart_match()
+	var should_pause: bool
+	if forced_state != null:
+		should_pause = bool(forced_state)
+	else:
+		should_pause = not get_tree().paused
+
+	get_tree().paused = should_pause
+	pause_modal.visible = should_pause
+
+	if should_pause:
+		if pause_controls_modal != null:
+			pause_controls_modal.visible = false
+		_update_pause_subtitle()
+		if pause_buttons.size() > 0:
+			pause_buttons[0].grab_focus()
+
+
+func _toggle_pause_controls(show_controls: bool) -> void:
+	if pause_controls_modal != null:
+		pause_controls_modal.visible = show_controls
+	if not show_controls and pause_buttons.size() > 2:
+		pause_buttons[2].grab_focus()
+
+
+func _update_pause_subtitle() -> void:
+	if pause_subtitle == null:
+		return
+	if has_node("/root/ArcadeManager") and get_node("/root/ArcadeManager").is_arcade_active:
+		var s_data: Dictionary = get_node("/root/ArcadeManager").get_current_stage_data()
+		pause_subtitle.text = "ARCADE — TRIAL %d / %d: %s" % [
+			int(s_data.get("stage", 1)),
+			int(s_data.get("total_stages", 4)),
+			String(s_data.get("name", "THE GAUNTLET")).to_upper()
+		]
+	else:
+		var vs_text := "VS CPU" if (fighter2 and fighter2.is_ai) else "LOCAL 2-PLAYER"
+		pause_subtitle.text = "VERSUS — %s (ROUND %d)" % [vs_text, round_number]
+
+
+func _on_restart_from_pause() -> void:
+	_toggle_pause(false)
+	restart_match()
+
+
+func _on_quit_to_main_menu() -> void:
+	_toggle_pause(false)
+	if has_node("/root/ArcadeManager"):
+		get_node("/root/ArcadeManager").end_arcade()
+	get_tree().change_scene_to_file("res://MainMenu.tscn")
